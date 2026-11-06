@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<!-- APP DE CHECKS · versión 31 · va junto con Codigo.gs versión 31
+     El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
+     En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
+<html lang="es">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Checks</title>
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Checks">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>
+  // Solo en la app instalable: manifiesto e íconos (en Apps Script no existen esos archivos)
+  if (!/googleusercontent\.com$|script\.google\.com$/.test(location.hostname)) {
+    [['manifest', 'manifest.json'], ['icon', 'icono-192.png'], ['apple-touch-icon', 'icono-180.png']].forEach(([rel, href]) => {
+      const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l);
+    });
+  }
+</script>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#fff; --txt:#1d2330; --muted:#6b7280; --line:#e5e7eb;
+    --pri:#1f6feb; --ok:#16a34a; --food:#d97706; --bad:#dc2626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{background:var(--pri);color:#fff;padding:16px;position:sticky;top:0;z-index:5}
+  header .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  header h1{margin:0;font-size:20px}
+  header .sub{opacity:.9;font-size:14px;margin-top:2px}
+  .link{background:none;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:8px;
+    padding:6px 10px;font-size:13px}
+  main{padding:16px;max-width:560px;margin:0 auto}
+  .card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .card h2{margin:0 0 4px;font-size:16px}
+  label{display:block;font-size:14px;font-weight:700;margin:14px 0 6px}
+  input,select{width:100%;padding:14px;font-size:17px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;color:var(--txt)}
+  input:focus,select:focus{outline:2px solid var(--pri);border-color:transparent}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:17px;font-size:17px;
+    font-weight:700;color:#fff;background:var(--pri);margin-top:16px}
+  .btn:disabled{opacity:.4}
+  .btn.ok{background:var(--ok)} .btn.bad{background:var(--bad)} .btn.food{background:var(--food)}
+  .activo{border-radius:12px;padding:14px;margin-top:10px;font-size:15px}
+  .activo.visita{background:#dcfce7;color:#14532d}
+  .activo.comida{background:#fef3c7;color:#78350f}
+  .activo b{font-size:17px}
+  .nota{font-size:13px;color:var(--muted);margin-top:8px}
+  .check{display:flex;align-items:center;gap:12px;margin:14px 0 0;padding:14px;border:2px solid var(--line);
+    border-radius:12px;font-size:17px;font-weight:700;cursor:pointer}
+  .check input{width:24px;height:24px;margin:0;accent-color:var(--pri);flex:0 0 24px}
+  .check.hecho{border-color:var(--pri);background:#dbeafe;color:#1e40af}
+  .btn.sec{background:#fff;color:var(--pri);border:2px solid var(--pri);margin-top:10px}
+  .tag.Coach{background:#ede9fe;color:#5b21b6}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:15;display:grid;place-items:center;padding:16px}
+  .modal .caja{background:#fff;border-radius:18px;padding:22px 18px;width:100%;max-width:420px;text-align:center}
+  .modal .pt{font-size:14px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+  .modal .pi{font-size:15px;margin:8px 0 4px}
+  .modal .palabra{font-size:clamp(34px,11vw,52px);font-weight:800;letter-spacing:.06em;color:var(--pri);
+    margin:14px 0 4px;word-break:break-word}
+  .hist{font-size:14px;margin:8px 0 0;padding:0;list-style:none}
+  .hist li{padding:10px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .hist li:first-child{border-top:0}
+  .hist .txt{flex:1;min-width:0}
+  .hist .n{font-weight:600}
+  .hist .h{color:var(--muted);font-size:13px}
+  .tag{font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px;flex:0 0 auto}
+  .tag.Visita{background:#dbeafe;color:#1e40af}
+  .tag.Comida{background:#fef3c7;color:#92400e}
+  .curso{color:var(--ok);font-weight:700}
+  .vacio{color:var(--muted);font-size:14px}
+  #cargando{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;place-items:center;z-index:20}
+  #cargando .box{background:#fff;border-radius:14px;padding:22px 26px;text-align:center;max-width:80%}
+  .spin{width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--pri);
+    border-radius:50%;margin:0 auto 10px;animation:g 1s linear infinite}
+  @keyframes g{to{transform:rotate(360deg)}}
+  #toast{position:fixed;left:16px;right:16px;bottom:20px;padding:14px 16px;border-radius:12px;
+    color:#fff;font-weight:600;display:none;z-index:30;text-align:center}
+  .tag.Venta{background:#dcfce7;color:#166534}
+  .grad{margin-top:14px;padding:12px 14px;border:2px solid var(--line);border-radius:12px}
+  .grad .gradT{font-size:14px;font-weight:700;color:var(--muted)}
+  .grad .check{margin-top:8px;border:0;padding:6px 0}
+  #modalPalabra{z-index:18} /* encima del resumen, para la foto de fin de jornada */
+  #modalPregunta{z-index:19} /* confirmaciones, encima de todo */
+  /* Ventana de ventas (pantalla completa) */
+  #modalVentas{position:fixed;inset:0;background:var(--bg);z-index:17;display:flex;flex-direction:column}
+  #modalVentas .top{background:var(--ok);color:#fff;padding:14px 16px}
+  #modalVentas .top h2{margin:0;font-size:18px}
+  #modalVentas .top .sub{font-size:13px;opacity:.9}
+  #modalVentas .cuerpo{flex:1;overflow:auto;padding:12px 16px}
+  #modalVentas .pie{background:#fff;border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  #modalVentas .pie .btn{margin-top:8px}
+  .buscador{position:sticky;top:0;background:var(--bg);padding-bottom:8px;z-index:1}
+  .resultados{list-style:none;margin:0;padding:0;background:#fff;border-radius:12px;overflow:hidden}
+  .resultados li{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .resultados li:first-child{border-top:0}
+  .resultados li .p{flex:1;min-width:0}
+  .resultados li .s{font-size:12px;color:var(--muted)}
+  .resultados li .mas{flex:0 0 auto;background:var(--ok);color:#fff;border:0;border-radius:10px;
+    padding:8px 14px;font-weight:700;font-size:15px}
+  .carrito{margin-top:14px}
+  .carrito h3{font-size:14px;margin:0 0 8px;display:flex;justify-content:space-between}
+  .item{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:grid;
+    grid-template-columns:1fr auto;gap:8px;align-items:center}
+  .item .p{font-weight:600;font-size:15px}
+  .item .s{font-size:12px;color:var(--muted)}
+  .item .quitar{background:none;border:0;color:var(--bad);font-size:22px;padding:4px 8px}
+  .item .monto{grid-column:1 / -1;display:grid;grid-template-columns:96px 1fr;gap:10px}
+  .item .monto label{margin:0 0 4px;font-size:12px;color:var(--muted);font-weight:700}
+  .item .monto .din{display:flex;align-items:center;gap:6px}
+  .item .monto .din span{font-size:20px;font-weight:700;color:var(--muted)}
+  .item .monto input{font-size:20px;font-weight:700;padding:10px 12px}
+  .item .monto input.pz{text-align:center}
+  .item .subt{grid-column:1 / -1;text-align:right;font-size:15px;color:var(--muted)}
+  .item .subt b{color:var(--txt);font-size:17px}
+  .totalv{font-size:15px;display:flex;justify-content:space-between;font-weight:700}
+  .btn.fin{background:#334155}
+  .activo.fin{background:#e2e8f0;color:#0f172a}
+  /* Resumen del día */
+  #modalResumen{position:fixed;inset:0;background:var(--bg);z-index:16;display:flex;flex-direction:column}
+  #modalResumen .top{background:#334155;color:#fff;padding:14px 16px}
+  #modalResumen .top h2{margin:0;font-size:18px}
+  #modalResumen .top .sub{font-size:13px;opacity:.9}
+  #modalResumen .cuerpo{flex:1;overflow:auto;padding:12px 16px}
+  #modalResumen .pie{background:#fff;border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  #modalResumen .pie .btn{margin-top:8px}
+  .cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+  .cifra{background:#fff;border-radius:12px;padding:10px;text-align:center}
+  .cifra b{display:block;font-size:20px}
+  .cifra span{font-size:12px;color:var(--muted)}
+  .tiendaR{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px}
+  .tiendaR .cab{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .tiendaR .nom{font-weight:700;font-size:16px}
+  .tiendaR .hrs{font-size:13px;color:var(--muted)}
+  .tiendaR ul{list-style:none;margin:10px 0 0;padding:0;font-size:14px}
+  .tiendaR li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dashed var(--line)}
+  .tiendaR li .s{font-size:12px;color:var(--muted)}
+  .tiendaR .sub{display:flex;justify-content:space-between;font-weight:700;padding-top:8px;
+    border-top:1px solid var(--line);margin-top:4px}
+  .tiendaR .editar{margin-top:10px;padding:12px;font-size:15px}
+  .tiendaR .sinv{font-size:14px;color:var(--muted);margin-top:8px}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <div>
+      <h1 id="titulo">Checks</h1>
+      <div class="sub" id="subtitulo">Cargando…</div>
+    </div>
+    <button class="link hidden" id="btnCambiar" onclick="cambiarImplant()">Cambiar</button>
+  </div>
+</header>
+
+<main>
+  <!-- Elegir implant -->
+  <section id="pImplant" class="hidden">
+    <div class="card">
+      <h2>¿Quién eres?</h2>
+      <label for="selImplant">Elige tu nombre</label>
+      <select id="selImplant"><option value="">Selecciona…</option></select>
+      <button class="btn" onclick="elegirImplant()">Continuar</button>
+    </div>
+  </section>
+
+  <!-- Aviso: esta pantalla es más vieja que el servidor -->
+  <div class="card hidden" id="avisoVersion" style="background:#fee2e2;color:#991b1b">
+    <b>⚠️ Hay una versión nueva de la app.</b><br>
+    Cierra la app por completo (deslízala en apps recientes) y vuelve a abrirla.
+  </div>
+
+  <!-- Link viejo → app nueva -->
+  <div class="card hidden" id="avisoAppNueva" style="background:#dbeafe;color:#1e3a8a">
+    <b>📲 Ya está la app instalable.</b><br>
+    Antes de cambiarte, termina tu jornada de hoy y revisa que no tengas registros pendientes.
+    <a class="btn" id="lnkAppNueva" href="#" target="_blank" style="text-align:center;text-decoration:none">Abrir la app nueva</a>
+  </div>
+
+  <!-- Botón para instalar (Android/Chrome) -->
+  <div class="card hidden" id="cardInstalar">
+    <b>📲 Instala la app en tu celular</b>
+    <div class="nota">Queda con su ícono y abre aunque no haya señal.</div>
+    <button class="btn" onclick="instalarApp()">Instalar</button>
+  </div>
+
+  <section id="pCheck" class="hidden">
+    <!-- Registros guardados en el celular (sin señal) -->
+    <div class="card hidden" id="cardPendientes">
+      <div id="txtPendientes" style="font-size:15px"></div>
+      <button class="btn sec" id="btnEnviarAhora" onclick="procesarCola(true)">Enviar ahora</button>
+      <button class="btn bad hidden" id="btnDescartar" onclick="descartarFallido()">Descartar este registro</button>
+    </div>
+    <!-- Inicio de jornada (foto + palabra del día) -->
+    <div class="card">
+      <h2>🌅 Inicio de jornada</h2>
+      <div class="activo fin hidden" id="inicioHecho">Jornada iniciada a las <b id="horaInicio"></b><span id="cedisInicio"></span></div>
+      <!-- Ruta y código postal: una sola vez, después de iniciar. El CP se copia a cada visita. -->
+      <div id="formRuta" class="hidden">
+        <label for="selRuta">Ruta</label>
+        <select id="selRuta" class="hidden"></select>
+        <input id="fRuta" type="text" autocomplete="off" list="sugRuta" maxlength="100"
+               placeholder="Escribe tu ruta">
+        <datalist id="sugRuta"></datalist>
+        <label for="fCp">Código postal</label>
+        <input id="fCp" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="5 dígitos"
+               oninput="this.value = this.value.replace(/\D/g, '').slice(0, 5)">
+        <button class="btn ok" id="btnRuta" onclick="guardarRutaDia()">✔ Guardar ruta y código postal</button>
+        <div class="nota">Solo se registra una vez al día.</div>
+      </div>
+      <!-- Coaching en el CEDIS: se pregunta al iniciar; la evidencia se anexa cuando se tenga -->
+      <div id="coachJ" class="hidden">
+        <label class="check" id="cajaCoachJ">
+          <input type="checkbox" id="chkCoachJ" onchange="coachJMarcado(this)">
+          <span>¿Harás coaching en el CEDIS?</span>
+        </label>
+        <label class="check hidden" id="cajaEvid">
+          <input type="checkbox" id="chkEvid" onchange="evidMarcada(this)">
+          <span id="txtEvid">Anexa evidencia de coaching</span>
+        </label>
+      </div>
+      <div id="formInicio">
+        <label for="fCedis">CEDIS donde inicias</label>
+        <select id="selCedis" class="hidden"></select>
+        <input id="fCedis" type="text" autocomplete="off" list="sugCedis" maxlength="100"
+               placeholder="Escribe el nombre del CEDIS">
+        <datalist id="sugCedis"></datalist>
+        <button class="btn ok" id="btnInicio" onclick="iniciarCheck('INICIO')">📷 Iniciar jornada</button>
+      </div>
+      <div class="nota hidden" id="notaInicio">Inicia tu jornada para poder registrar tiendas y comida.</div>
+    </div>
+
+    <!-- Visita a tienda -->
+    <div class="card">
+      <h2>🏪 Visita a tienda</h2>
+
+      <!-- Sin visita abierta: formulario de entrada -->
+      <div id="formEntrada">
+        <label for="fTienda">Tienda</label>
+        <input id="fTienda" type="text" autocomplete="off" list="sugTiendas"
+               placeholder="Escribe el nombre de la tienda">
+        <datalist id="sugTiendas"></datalist>
+        <div id="camposExtra"></div>
+        <button class="btn ok" id="btnEntrada" onclick="iniciarCheck('ENTRADA')">📍 Registrar ENTRADA</button>
+        <div class="nota hidden" id="notaRuta">Guarda tu ruta y código postal (arriba) para poder entrar a una tienda.</div>
+        <div class="nota hidden" id="notaComida">Registra tu regreso de comida para poder entrar a una tienda.</div>
+      </div>
+
+      <!-- Con visita abierta: salida -->
+      <div id="formSalida" class="hidden">
+        <div class="activo visita">Estás en <b id="tiendaActual"></b><br>desde las <span id="desdeVisita"></span></div>
+
+        <!-- Labor de venta (opcional): al marcarla se abre la lista de SKU -->
+        <!-- Graduación (se guarda Sí / No al registrar la salida) -->
+        <div class="grad">
+          <div class="gradT">Graduación</div>
+          <label class="check"><input type="checkbox" id="chkG1" onchange="guardarGrad()"><span>3° a 12° (RTD)</span></label>
+          <label class="check"><input type="checkbox" id="chkG2" onchange="guardarGrad()"><span>13° a 45°</span></label>
+        </div>
+
+        <label class="check" id="cajaVenta">
+          <input type="checkbox" id="chkVenta" onchange="ventaMarcada(this)">
+          <span id="txtVenta">Labor de venta</span>
+        </label>
+        <button class="btn sec hidden" id="btnMasVentas" onclick="abrirVentas()">🛒 Agregar ventas</button>
+
+        <button class="btn bad" onclick="iniciarCheck('SALIDA')">📍 Registrar SALIDA</button>
+      </div>
+    </div>
+
+    <!-- Comida -->
+    <div class="card">
+      <h2>🍽️ Comida</h2>
+      <div id="comidaLibre">
+        <button class="btn food" id="btnComida" onclick="iniciarCheck('COMIDA_INI')">Salir a comer</button>
+        <div class="nota hidden" id="notaVisita">Registra tu salida de la tienda antes de ir a comer.</div>
+      </div>
+      <div id="comidaAbierta" class="hidden">
+        <div class="activo comida">En comida desde las <b id="desdeComida"></b></div>
+        <button class="btn food" onclick="iniciarCheck('COMIDA_FIN')">Regresé de comer</button>
+      </div>
+    </div>
+
+    <!-- Fin de jornada -->
+    <div class="card">
+      <h2>🏁 Fin de jornada</h2>
+      <div class="activo fin hidden" id="finHecho">Jornada finalizada a las <b id="horaFin"></b></div>
+      <button class="btn fin" id="btnFinalizar" onclick="abrirResumen()">Finalizar jornada</button>
+    </div>
+
+    <!-- Historial -->
+    <div class="card">
+      <h2>Mis registros de hoy</h2>
+      <ul class="hist" id="historial"></ul>
+    </div>
+  </section>
+</main>
+
+<!-- Palabra al azar antes de la foto de entrada/salida -->
+<div id="modalPalabra" class="modal hidden">
+  <div class="caja">
+    <div class="pt" id="palabraTitulo">Foto de ENTRADA</div>
+    <div class="pi">Escribe esta palabra en un papel (o muéstrala en pantalla) y que salga en tu foto:</div>
+    <div class="palabra" id="palabra">—</div>
+    <button class="btn" onclick="abrirCamara()">📷 Tomar foto</button>
+    <button class="btn sec" onclick="cancelarPalabra()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Labor de venta: buscador de SKU y montos -->
+<div id="modalVentas" class="hidden">
+  <div class="top">
+    <h2 id="ventasTitulo">🛒 Labor de venta</h2>
+    <div class="sub" id="ventasTienda"></div>
+  </div>
+  <div class="cuerpo">
+    <div class="buscador">
+      <input id="fBuscar" type="search" autocomplete="off" placeholder="🔍 Buscar producto o SKU" oninput="buscarSku()">
+    </div>
+    <ul class="resultados" id="resultados"></ul>
+    <div class="carrito">
+      <h3><span>Productos vendidos</span><span id="contador">0 de 20</span></h3>
+      <div id="carrito"><div class="vacio">Busca un producto y toca <b>+ Agregar</b>.</div></div>
+    </div>
+  </div>
+  <div class="pie">
+    <div class="totalv"><span>Total <small id="piezasCarrito" style="font-weight:400;color:var(--muted)"></small></span><span id="totalCarrito">$0.00</span></div>
+    <button class="btn ok" onclick="guardarVentas()">Guardar ventas</button>
+    <button class="btn sec" onclick="cerrarVentas()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Resumen del día -->
+<div id="modalResumen" class="hidden">
+  <div class="top">
+    <h2>🏁 Resumen del día</h2>
+    <div class="sub" id="resumenSub"></div>
+  </div>
+  <div class="cuerpo" id="resumenCuerpo"></div>
+  <div class="pie">
+    <div class="totalv"><span>Total vendido hoy</span><span id="resumenTotal">$0.00</span></div>
+    <div class="nota hidden" id="resumenNota"></div>
+    <button class="btn fin" id="btnConfirmarFin" onclick="confirmarFin()">📷 Confirmar y finalizar jornada</button>
+    <button class="btn sec" onclick="cerrarResumen()">Volver</button>
+  </div>
+</div>
+
+<input type="file" id="camara" accept="image/*" capture="environment" class="hidden">
+<!-- Confirmaciones (reemplaza la ventana del navegador) -->
+<div id="modalPregunta" class="modal hidden">
+  <div class="caja">
+    <div class="pi" id="preguntaTexto" style="font-size:17px;font-weight:600;white-space:pre-line;margin:4px 0 6px"></div>
+    <button class="btn" id="preguntaSi">Aceptar</button>
+    <button class="btn sec" id="preguntaNo">Cancelar</button>
+  </div>
+</div>
+
+<div id="cargando"><div class="box"><div class="spin"></div><div id="msgCarga">Guardando…</div></div></div>
+<div id="toast"></div>
+
+<script>
+  const NOMBRES = {
+    ENTRADA: 'Entrada', SALIDA: 'Salida', COMIDA_INI: 'Salida a comer', COMIDA_FIN: 'Regreso de comida',
+    COACHING: 'Coaching', COACHING_J: 'Coaching en CEDIS', INICIO: 'Inicio de jornada', FIN: 'Fin de jornada'
+  };
+
+  let implant = null;
+  let datos = { implants: [], campos: [], fotoEnComida: false }; // viene de la hoja LISTAS
+  let hoy = { abierto: null, lista: [] };
+  let checkPendiente = null;      // datos del check mientras se toma la foto
+  let ubicacionPendiente = null;  // la ubicación se pide en cuanto se toca el botón
+
+  const $ = id => document.getElementById(id);
+  const mostrar = (id, si) => $(id).classList.toggle('hidden', !si);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  /* ======== CONEXIÓN CON EL SERVIDOR ========
+     App instalable: pega aquí el link /exec de tu implementación de Apps Script. */
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyN-9nvBLIfZhkVpuud8PQVjznezmiU2iarZ8xntoQPjbBPlsAVWkDP_0IR0-rKTYD8MQ/exec';
+
+  const EN_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
+  function srv(fn, ...args){
+    if (EN_APPS_SCRIPT){
+      return new Promise((res, rej) =>
+        google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+    }
+    if (!/^https:\/\/script\.google\.com\//.test(API_URL))
+      return Promise.reject(new Error('Falta configurar API_URL en index.html con el link /exec.'));
+    // text/plain evita la "pregunta previa" (CORS) que Apps Script no contesta
+    return fetch(API_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ fn, args })
+    }).then(async r => {
+      let o;
+      try { o = await r.json(); }
+      catch(e){ throw new Error('El servidor no contestó bien (revisa que la implementación sea "Cualquier usuario").'); }
+      if (!o.ok) throw new Error(o.error || 'Error del servidor');
+      return o.r;
+    });
+  }
+  function guardarLocal(k, v){ try{ v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); }catch(e){} }
+  function leerLocal(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+
+  function cargando(on, msg){ $('msgCarga').textContent = msg || 'Guardando…'; $('cargando').style.display = on ? 'grid' : 'none'; }
+  function aviso(msg, tipo){
+    const t = $('toast');
+    t.textContent = msg;
+    // verde = enviado · naranja = guardado en el celular (sin señal) · rojo = error
+    t.style.background = tipo === 'error' ? 'var(--bad)' : tipo === 'pendiente' ? '#b45309' : 'var(--ok)';
+    t.style.display = 'block';
+    clearTimeout(aviso._t);
+    aviso._t = setTimeout(() => t.style.display = 'none', tipo === 'error' ? 5000 : 2500);
+  }
+  function errMsg(e){ return (e && e.message ? e.message : String(e)).replace(/^Error:\s*/, ''); }
+  function hoyTexto(){
+    return new Date().toLocaleDateString('es-MX', { timeZone:'America/Mexico_City', weekday:'long', day:'numeric', month:'long' });
+  }
+
+  /* -------- Elegir implant -------- */
+  /* -------- Caché en el celular --------
+     Implants, listas y SKU se guardan en el celular: la app abre al instante con
+     lo guardado y lo actualiza por detrás con lo que haya en el Sheet. */
+  const CACHE_DATOS = 'cache_datos_v1';
+  const CACHE_SKUS = 'cache_skus_v1';
+  function leerCache(k){ try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
+  function guardarCache(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ /* sin espacio: sin caché */ } }
+
+  async function iniciar(){
+    const enCache = leerCache(CACHE_DATOS);
+    if (enCache && Array.isArray(enCache.implants)){
+      datos = enCache;
+      arrancar();
+      actualizarDatos(); // en segundo plano
+      return;
+    }
+    cargando(true, 'Cargando…');
+    try{ datos = await srv('getDatos'); guardarCache(CACHE_DATOS, datos); }
+    catch(e){ cargando(false); aviso(errMsg(e), 'error'); return; }
+    cargando(false);
+    arrancar();
+  }
+
+  // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
+  const VERSION_APP = 31;
+  function revisarVersion(){
+    mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
+    // Link viejo: invita a pasarse a la app instalable
+    const nueva = EN_APPS_SCRIPT && datos.urlApp;
+    if (nueva) $('lnkAppNueva').href = datos.urlApp;
+    mostrar('avisoAppNueva', !!nueva);
+  }
+
+  function arrancar(){
+    revisarVersion();
+    const guardado = leerLocal('implant');
+    if (guardado && datos.implants.includes(guardado)){ entrar(guardado); return; }
+    mostrarSeleccion();
+  }
+
+  // Trae implants y listas nuevas sin hacer esperar; solo repinta lo que cambió
+  async function actualizarDatos(){
+    let nuevos;
+    try{ nuevos = await srv('getDatos'); }catch(e){ return; } // sin señal: se queda lo guardado
+    const cambioImplants = JSON.stringify(nuevos.implants) !== JSON.stringify(datos.implants);
+    const cambioCampos = JSON.stringify(nuevos.campos) !== JSON.stringify(datos.campos);
+    datos = nuevos;
+    revisarVersion();
+    if (implant) pintarCedis();
+    guardarCache(CACHE_DATOS, nuevos);
+    if (cambioImplants && !$('pImplant').classList.contains('hidden')){
+      const elegido = $('selImplant').value;
+      mostrarSeleccion();
+      $('selImplant').value = elegido;
+    }
+    if (cambioCampos && implant){
+      // Conserva lo que ya hubieran elegido en las listas
+      const antes = {};
+      document.querySelectorAll('#camposExtra [id^="campo"]').forEach(el => {
+        const lab = document.querySelector(`label[for="${el.id}"]`);
+        if (lab) antes[lab.textContent] = el.value;
+      });
+      pintarCamposExtra();
+      (datos.campos || []).forEach((c, i) => { if (antes[c.nombre]) $('campo' + i).value = antes[c.nombre]; });
+    }
+  }
+
+  function mostrarSeleccion(){
+    mostrar('pCheck', false); mostrar('btnCambiar', false);
+    $('titulo').textContent = 'Checks';
+    $('subtitulo').textContent = hoyTexto();
+    $('selImplant').innerHTML = '<option value="">Selecciona…</option>' +
+      datos.implants.map(n => `<option>${esc(n)}</option>`).join('');
+    mostrar('pImplant', true);
+  }
+
+  function elegirImplant(){
+    const n = $('selImplant').value;
+    if (!n){ aviso('Elige tu nombre', 'error'); return; }
+    guardarLocal('implant', n);
+    entrar(n);
+  }
+
+  async function cambiarImplant(){
+    if (!(await preguntar('¿Cambiar de implant?', 'Sí, cambiar'))) return;
+    guardarLocal('implant', null);
+    implant = null;
+    mostrarSeleccion();
+  }
+
+  async function entrar(n){
+    implant = n;
+    vigilarUbicacion(); // enciende el GPS desde que abre la app
+    mostrar('pImplant', false); mostrar('pCheck', true); mostrar('btnCambiar', true);
+    $('titulo').textContent = n;
+    $('subtitulo').textContent = hoyTexto();
+    pintarCamposExtra();
+    cargando(true, 'Cargando tus registros…');
+    const local = leerHoyLocal(n);
+    if (leerCola().length && local){
+      // Hay registros sin enviar: se muestra lo del celular y se envían
+      hoy = local; pintar(); cargando(false);
+      procesarCola();
+    } else {
+      try{ hoy = await srv('getHoy', n); pintar(); }
+      catch(e){
+        if (local && esErrorDeRed(e)){ hoy = local; pintar(); aviso('📶 Sin señal: se muestra lo guardado en el celular', 'pendiente'); }
+        else aviso(errMsg(e), 'error');
+      }
+      cargando(false);
+    }
+    pintarPendientes();
+    precargarSkus(); // deja el catálogo listo para cuando abran ventas
+  }
+
+  /* -------- Listas extra (columnas B, C... de LISTAS) -------- */
+  function pintarCamposExtra(){
+    $('camposExtra').innerHTML = (datos.campos || []).map((c, i) => {
+      if (c.tipo === 'cp'){
+        return `<label for="campo${i}">${esc(c.nombre)}</label>
+          <input id="campo${i}" type="text" inputmode="numeric" maxlength="5" placeholder="5 dígitos" list="sug${i}">
+          <datalist id="sug${i}">${c.opciones.map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
+      }
+      return `<label for="campo${i}">${esc(c.nombre)}</label>
+        <select id="campo${i}"><option value="">Selecciona…</option>
+          ${c.opciones.map(o => `<option>${esc(o)}</option>`).join('')}</select>`;
+    }).join('');
+  }
+
+  function limpiarFormulario(){
+    $('fTienda').value = '';
+    (datos.campos || []).forEach((c, i) => { $('campo' + i).value = ''; });
+  }
+
+  /* -------- Pintar pantalla según lo que esté abierto -------- */
+  function pintar(){
+    guardarHoyLocal();
+    const a = hoy.abierto;
+    const enVisita = a && a.tipo === 'Visita';
+    const enComida = a && a.tipo === 'Comida';
+
+    // Visita
+    mostrar('formEntrada', !enVisita);
+    mostrar('formSalida', enVisita);
+    $('btnEntrada').disabled = !!enComida;
+    mostrar('notaComida', enComida);
+    if (enVisita){
+      $('tiendaActual').textContent = a.tienda;
+      $('desdeVisita').textContent = a.horaEntrada;
+      // Graduación: se recuerda en el celular hasta registrar la salida
+      const g = leerGrad();
+      $('chkG1').checked = !!g.g1;
+      $('chkG2').checked = !!g.g2;
+      // Labor de venta de la visita abierta
+      const conVentas = a.ventas > 0;
+      $('chkVenta').checked = conVentas;
+      $('chkVenta').disabled = conVentas;
+      $('cajaVenta').classList.toggle('hecho', conVentas);
+      $('txtVenta').textContent = conVentas
+        ? `Labor de venta: ${a.ventas} ${a.ventas === 1 ? 'venta' : 'ventas'} · ${pzs(a.piezas)} · ${pesos(a.total)}`
+        : 'Labor de venta';
+      mostrar('btnMasVentas', conVentas && a.ventas < MAX_VENTAS);
+      $('btnMasVentas').textContent = '🛒 Agregar más ventas';
+    }
+
+    // Comida
+    mostrar('comidaLibre', !enComida);
+    mostrar('comidaAbierta', enComida);
+    $('btnComida').disabled = !!enVisita;
+    mostrar('notaVisita', enVisita);
+    if (enComida) $('desdeComida').textContent = a.horaEntrada;
+
+    // Fin de jornada
+    const fin = !!hoy.finalizada;
+    mostrar('finHecho', fin);
+    $('horaFin').textContent = hoy.finalizada || '';
+    $('btnFinalizar').textContent = fin ? 'Ver resumen del día' : 'Finalizar jornada';
+
+    // Inicio de jornada: sin iniciar, no se puede registrar nada más
+    const iniciada = !!hoy.iniciada;
+    mostrar('inicioHecho', iniciada);
+    $('horaInicio').textContent = hoy.iniciada || '';
+    mostrar('formInicio', !iniciada && !fin);
+    $('cedisInicio').textContent = (hoy.cedis ? ` en ${hoy.cedis}` : '') + (hoy.preventa ? ` · Ruta: ${hoy.preventa}` : '') +
+      (hoy.cp ? ` · CP: ${hoy.cp}` : '');
+    const faltaRuta = iniciada && !fin && !(hoy.preventa && hoy.cp);
+    mostrar('formRuta', faltaRuta);
+    pintarCoachJ(iniciada, fin);
+    // Sugiere los CEDIS y rutas que este celular ya usó (cuando se escriben a mano)
+    $('sugCedis').innerHTML = usados('cedis').map(c => `<option value="${esc(c)}">`).join('');
+    $('sugRuta').innerHTML = usados('ruta').map(c => `<option value="${esc(c)}">`).join('');
+    if (!iniciada && !fin && !$('fCedis').value) $('fCedis').value = usados('cedis')[0] || '';
+    pintarCedis();
+    if (faltaRuta && !$('fRuta').value) $('fRuta').value = hoy.preventa || usados('ruta')[0] || '';
+    if (faltaRuta && hoy.preventa) $('selRuta').value = hoy.preventa;
+    mostrar('notaInicio', !iniciada && !fin);
+    $('btnFinalizar').disabled = !iniciada && !fin;
+
+    const bloqueado = fin || !iniciada;
+    $('fTienda').disabled = bloqueado || faltaRuta;
+    if (bloqueado){
+      $('btnEntrada').disabled = true;
+      $('btnComida').disabled = true;
+    }
+    if (faltaRuta) $('btnEntrada').disabled = true;
+    mostrar('notaRuta', faltaRuta && !enVisita);
+
+    // Sugerencias de tienda con las de hoy
+    const tiendas = [...new Set(hoy.lista.map(h => h.tienda).filter(Boolean))];
+    $('sugTiendas').innerHTML = tiendas.map(t => `<option value="${esc(t)}">`).join('');
+
+    // Historial: una línea por visita o comida
+    $('historial').innerHTML = hoy.lista.length
+      ? hoy.lista.slice().reverse().map(h => {
+          const nombre = h.tipo === 'Comida' ? 'Comida' : esc(h.tienda);
+          const horas = h.horaSalida
+            ? `${esc(h.horaEntrada)} – ${esc(h.horaSalida)} · ${h.duracion} min`
+            : `${esc(h.horaEntrada)} – <span class="curso">en curso</span>`;
+          const coach = h.coaching ? ` <span class="tag Coach">Coaching ${esc(h.coaching)}</span>` : '';
+          const venta = h.ventas ? ` <span class="tag Venta">${h.ventas} ${h.ventas === 1 ? 'venta' : 'ventas'} · ${pesos(h.total)}</span>` : '';
+          return `<li><span class="tag ${esc(h.tipo)}">${esc(h.tipo)}</span>
+            <div class="txt"><div class="n">${nombre}${coach}${venta}</div><div class="h">${horas}</div></div></li>`;
+        }).join('')
+      : '<li class="vacio">Aún no tienes registros hoy.</li>';
+  }
+
+  /* -------- Ruta y código postal del día (una sola vez) -------- */
+  async function guardarRutaDia(){
+    const conRutas = !$('selRuta').classList.contains('hidden');
+    const ruta = (conRutas ? $('selRuta').value : $('fRuta').value).trim();
+    const cp = $('fCp').value.trim();
+    if (!ruta){ aviso(conRutas ? 'Elige tu ruta' : 'Escribe tu ruta', 'error'); $(conRutas ? 'selRuta' : 'fRuta').focus(); return; }
+    if (!/^\d{5}$/.test(cp)){ aviso('El código postal debe tener 5 dígitos', 'error'); $('fCp').focus(); return; }
+    if (!(await preguntar(`¿Guardar tu ruta de hoy?\nRuta: ${ruta}\nCP: ${cp}\n\nYa no se podrá cambiar.`, 'Sí, guardar', false, 'Corregir'))) return;
+    try{
+      const r = await operar('guardarRuta', { implant, ruta, cp }, `Ruta ${ruta} · CP ${cp}`,
+        () => aplicarLocal('RUTA', { ruta, cp }));
+      recordar('ruta', ruta);
+      pintar();
+      aviso(r.enviado ? '✓ Ruta y código postal guardados' : '📶 Guardado en el celular; se enviará al volver la señal',
+        r.enviado ? '' : 'pendiente');
+    }catch(e){ aviso(errMsg(e), 'error'); }
+  }
+
+  /* -------- Coaching en el CEDIS --------
+     Al iniciar jornada se pregunta si hará coaching. Si dice que sí, aparece la casilla
+     "Anexa evidencia de coaching": al marcarla se abre la cámara. Todo va a la fila "Jornada". */
+  function pintarCoachJ(iniciada, fin){
+    const sera = hoy.coachJ === 'Sí';
+    const evid = !!hoy.coachJHora;
+    // Se muestra con la jornada iniciada; ya finalizada, solo si hubo coaching
+    mostrar('coachJ', iniciada && (!fin || sera));
+    $('chkCoachJ').checked = sera;
+    $('chkCoachJ').disabled = evid || fin;
+    $('cajaCoachJ').classList.toggle('hecho', sera);
+    mostrar('cajaEvid', sera);
+    $('chkEvid').checked = evid;
+    $('chkEvid').disabled = evid || fin;
+    $('cajaEvid').classList.toggle('hecho', evid);
+    $('txtEvid').textContent = evid ? `Evidencia de coaching anexada (${hoy.coachJHora})`
+      : fin ? 'Sin evidencia de coaching' : 'Anexa evidencia de coaching';
+  }
+
+  async function guardarCoachJ(hara){
+    try{
+      const r = await operar('coachingJornada', { implant, hara }, NOMBRES.COACHING_J + (hara ? ': Sí' : ': No'),
+        () => aplicarLocal('COACHING_J', { hara }));
+      pintar();
+      aviso(r.enviado ? (hara ? '✓ Coaching: Sí. Anexa la evidencia cuando la tengas' : '✓ Coaching: No')
+        : '📶 Guardado en el celular; se enviará al volver la señal', r.enviado ? '' : 'pendiente');
+    }catch(e){ aviso(errMsg(e), 'error'); pintar(); }
+  }
+  function coachJMarcado(chk){ guardarCoachJ(chk.checked); }
+
+  // Justo después de iniciar jornada
+  async function preguntarCoachJ(){
+    const si = await preguntar('¿Harás coaching hoy en el CEDIS?', 'Sí, haré coaching', false, 'No');
+    guardarCoachJ(si);
+  }
+
+  function evidMarcada(chk){
+    chk.checked = false; // se marca sola cuando la foto quede guardada
+    iniciarCheck('COACHING_J');
+  }
+
+  /* -------- Labor de venta -------- */
+  const MAX_VENTAS = 20;
+  let skus = null;    // catálogo de la hoja SKU (se carga la primera vez)
+  let carrito = [];   // [{ idVenta?, sku, producto, piezas, precio }]  (monto = piezas × precio)
+  let edicion = null; // { idVisita, tienda } cuando se editan ventas desde el resumen
+
+  const pesos = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pzs = n => `${n || 0} ${n === 1 ? 'pza' : 'pzas'}`;
+  const sinAcentos = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  function ventaMarcada(chk){
+    if (chk.checked) abrirVentas();
+    else mostrar('btnMasVentas', false);
+  }
+
+  let skusActualizados = false; // ya se pidió el catálogo al Sheet en esta sesión
+
+  function prepararSkus(lista){
+    return lista.map(x => ({ sku: x.sku, producto: x.producto, busca: sinAcentos(x.sku + ' ' + x.producto) }));
+  }
+
+  // Actualiza el catálogo por detrás (se llama al entrar a la app)
+  function precargarSkus(){
+    if (skusActualizados) return;
+    skusActualizados = true;
+    srv('getSkus').then(lista => {
+      guardarCache(CACHE_SKUS, lista);
+      skus = prepararSkus(lista);
+      if (!$('modalVentas').classList.contains('hidden')) buscarSku();
+    }).catch(() => { skusActualizados = false; }); // sin señal: se intenta otra vez después
+  }
+
+  async function cargarSkus(){
+    if (!skus){
+      const enCache = leerCache(CACHE_SKUS);
+      if (enCache && enCache.length){
+        skus = prepararSkus(enCache); // al instante, desde el celular
+      } else {
+        cargando(true, 'Cargando productos…');
+        try{ const lista = await srv('getSkus'); guardarCache(CACHE_SKUS, lista); skus = prepararSkus(lista); skusActualizados = true; }
+        catch(e){ cargando(false); aviso(errMsg(e), 'error'); return false; }
+        cargando(false);
+      }
+    }
+    precargarSkus();
+    return true;
+  }
+
+  // ed = null: nuevas ventas en la visita abierta
+  // ed = { idVisita, tienda, ventas }: corregir las ventas de una visita desde el resumen
+  async function abrirVentas(ed){
+    if (!(await cargarSkus())) return;
+    if (!skus.length){ aviso('No hay productos en la hoja SKU', 'error'); $('chkVenta').checked = false; return; }
+    edicion = ed && ed.idVisita ? ed : null;
+    carrito = edicion ? edicion.ventas.map(x => ({ idVenta: x.idVenta, sku: x.sku, producto: x.producto,
+      precio: Number(x.precio || 0).toFixed(2), piezas: String(x.piezas || 1) })) : [];
+    $('ventasTitulo').textContent = edicion ? '✏️ Editar ventas' : '🛒 Labor de venta';
+    $('ventasTienda').textContent = edicion ? edicion.tienda : (hoy.abierto ? hoy.abierto.tienda : '');
+    $('fBuscar').value = '';
+    buscarSku();
+    pintarCarrito();
+    mostrar('modalVentas', true);
+  }
+
+  async function cerrarVentas(){
+    if (edicion){
+      edicion = null; carrito = [];
+      mostrar('modalVentas', false);
+      return;
+    }
+    if (carrito.length && !(await preguntar('¿Salir sin guardar estas ventas?', 'Salir sin guardar', true))) return;
+    carrito = [];
+    mostrar('modalVentas', false);
+    // Si no guardó nada, la casilla se desmarca
+    const yaTiene = !!(hoy.abierto && hoy.abierto.ventas > 0);
+    $('chkVenta').checked = yaTiene;
+    mostrar('btnMasVentas', yaTiene && hoy.abierto.ventas < MAX_VENTAS);
+  }
+
+  // Ventas ya guardadas que cuentan para el máximo (en edición, todo está en el carrito)
+  function yaGuardadas(){
+    return edicion ? 0 : ((hoy.abierto && hoy.abierto.ventas) || 0);
+  }
+
+  function disponibles(){
+    return MAX_VENTAS - yaGuardadas() - carrito.length;
+  }
+
+  function buscarSku(){
+    const q = sinAcentos($('fBuscar').value.trim());
+    const palabras = q.split(/\s+/).filter(Boolean);
+    const lista = palabras.length
+      ? skus.filter(x => palabras.every(p => x.busca.includes(p)))
+      : skus;
+    const muestra = lista.slice(0, 30);
+    $('resultados').innerHTML = muestra.length
+      ? muestra.map(x => `<li><div class="p">${esc(x.producto || x.sku)}<div class="s">SKU ${esc(x.sku)}</div></div>
+          <button class="mas" onclick="agregarSku(${skus.indexOf(x)})">+ Agregar</button></li>`).join('') +
+        (lista.length > 30 ? `<li class="vacio">…y ${lista.length - 30} más. Escribe más para filtrar.</li>` : '')
+      : '<li class="vacio">No se encontró ningún producto.</li>';
+  }
+
+  function agregarSku(indice){
+    if (disponibles() <= 0){ aviso(`Máximo ${MAX_VENTAS} ventas por visita`, 'error'); return; }
+    const x = skus[indice];
+    if (!x) return;
+    leerMontos();
+    carrito.push({ sku: x.sku, producto: x.producto, precio: '', piezas: '1' });
+    pintarCarrito();
+    // Enfoca el precio recién agregado (piezas ya trae 1)
+    const inputs = document.querySelectorAll('#carrito .monto input.din-in');
+    const ultimo = inputs[inputs.length - 1];
+    if (ultimo){ ultimo.scrollIntoView({ block: 'center' }); ultimo.focus(); }
+  }
+
+  function quitarSku(i){
+    leerMontos();
+    carrito.splice(i, 1);
+    pintarCarrito();
+  }
+
+  // Guarda en el carrito lo que van escribiendo (piezas y precio por unidad)
+  function leerMontos(){
+    document.querySelectorAll('#carrito .item').forEach((it, i) => {
+      if (!carrito[i]) return;
+      carrito[i].precio = it.querySelector('input.din-in').value;
+      carrito[i].piezas = it.querySelector('input.pz').value;
+    });
+  }
+
+  // Monto de un producto = piezas × precio por unidad (redondeado a centavos)
+  function montoDe(x){
+    const pz = aPiezas(x.piezas), pr = aNumero(x.precio);
+    return pz >= 1 && pr > 0 ? Math.round(pz * pr * 100) / 100 : 0;
+  }
+
+  // Piezas: número entero de 1 a 9999
+  function aPiezas(txt){
+    const s = String(txt || '').trim();
+    return /^\d{1,4}$/.test(s) && Number(s) >= 1 ? Number(s) : NaN;
+  }
+
+  // Acepta "120", "120.5", "120,50", "$1,250.00"
+  function aNumero(txt){
+    let s = String(txt || '').replace(/[$\s]/g, '');
+    if (/^\d+,\d{1,2}$/.test(s)) s = s.replace(',', '.'); // coma decimal
+    s = s.replace(/,/g, '');                              // separador de miles
+    return /^\d+(\.\d{1,2})?$/.test(s) ? Number(s) : NaN;
+  }
+
+  function pintarCarrito(){
+    $('contador').textContent = `${yaGuardadas() + carrito.length} de ${MAX_VENTAS}`;
+    $('carrito').innerHTML = carrito.length
+      ? carrito.map((x, i) => `<div class="item">
+          <div><div class="p">${esc(x.producto || x.sku)}</div><div class="s">SKU ${esc(x.sku)}</div></div>
+          <button class="quitar" onclick="quitarSku(${i})" aria-label="Quitar">✕</button>
+          <div class="monto">
+            <div><label>Piezas</label>
+              <input class="pz" type="text" inputmode="numeric" maxlength="4" value="${esc(x.piezas)}"
+                     onfocus="this.select()" oninput="actualizarTotal()"></div>
+            <div><label>Precio por unidad</label>
+              <div class="din"><span>$</span>
+                <input class="din-in" type="text" inputmode="decimal" placeholder="0.00" value="${esc(x.precio)}" oninput="actualizarTotal()">
+              </div></div>
+          </div>
+          <div class="subt">Monto: <b class="subt-n">$0.00</b></div></div>`).join('')
+      : '<div class="vacio">Busca un producto y toca <b>+ Agregar</b>.</div>';
+    actualizarTotal();
+  }
+
+  function actualizarTotal(){
+    leerMontos();
+    // Monto de cada producto (piezas × precio), al momento
+    document.querySelectorAll('#carrito .item .subt-n').forEach((el, i) => {
+      if (carrito[i]) el.textContent = pesos(montoDe(carrito[i]));
+    });
+    const total = carrito.reduce((s, x) => s + montoDe(x), 0);
+    const piezas = carrito.reduce((s, x) => s + (aPiezas(x.piezas) || 0), 0);
+    $('totalCarrito').textContent = pesos(total);
+    $('piezasCarrito').textContent = carrito.length ? `· ${pzs(piezas)}` : '';
+  }
+
+  async function guardarVentas(){
+    leerMontos();
+    if (!carrito.length && !edicion){ aviso('Agrega al menos un producto', 'error'); return; }
+    if (!carrito.length && !(await preguntar('¿Quitar todas las ventas de esta tienda?', 'Sí, quitar', true))) return;
+    const ventas = [];
+    for (let i = 0; i < carrito.length; i++){
+      const item = document.querySelectorAll('#carrito .item')[i];
+      const nombre = carrito[i].producto || carrito[i].sku;
+      const pz = aPiezas(carrito[i].piezas);
+      if (!(pz >= 1)){
+        aviso(`Revisa las piezas de ${nombre} (número entero, mínimo 1)`, 'error');
+        item.querySelector('input.pz').focus();
+        return;
+      }
+      const precio = aNumero(carrito[i].precio);
+      if (!(precio > 0)){
+        aviso(`Escribe el precio por unidad de ${nombre} (ej. 25.50)`, 'error');
+        item.querySelector('input.din-in').focus();
+        return;
+      }
+      ventas.push({ idVenta: carrito[i].idVenta || '', sku: carrito[i].sku, piezas: pz, precio,
+                    monto: Math.round(pz * precio * 100) / 100 });
+    }
+
+    // Corrección desde el resumen (necesita señal y que no haya pendientes)
+    if (edicion){
+      if (leerCola().length){ aviso('Espera a que se envíen los registros pendientes para editar', 'error'); return; }
+      cargando(true, 'Guardando cambios…');
+      try{
+        resumen = await srv('guardarVentasVisita', { implant, idVisita: edicion.idVisita, ventas });
+        hoy = resumen.hoy;
+        edicion = null; carrito = [];
+        mostrar('modalVentas', false);
+        pintar();
+        pintarResumen();
+        aviso('✓ Ventas corregidas');
+      }catch(e){ aviso(errMsg(e), 'error'); }
+      cargando(false);
+      return;
+    }
+
+    cargando(true, 'Guardando ventas…');
+    try{
+      const detalle = carrito.map((x, i) => ({ sku: x.sku, producto: x.producto, piezas: ventas[i].piezas,
+                                                precio: ventas[i].precio, monto: ventas[i].monto }));
+      const r = await operar('registrarVentas', { implant, ventas }, 'Ventas', () => aplicarLocal('VENTAS', { detalle }));
+      carrito = [];
+      mostrar('modalVentas', false);
+      pintar();
+      const n = ventas.length, txt = n === 1 ? 'venta' : 'ventas';
+      aviso(r.enviado ? `✓ ${n} ${txt} guardada${n === 1 ? '' : 's'}` : `📶 ${n} ${txt} guardada${n === 1 ? '' : 's'} en el celular`, r.enviado ? '' : 'pendiente');
+      if (navigator.vibrate) navigator.vibrate(80);
+    }catch(e){
+      aviso(errMsg(e), 'error');
+    }
+    cargando(false);
+  }
+
+  /* -------- Resumen y fin de jornada -------- */
+  let resumen = null;
+
+  async function abrirResumen(){
+    cargando(true, 'Armando tu resumen…');
+    if (leerCola().length) await procesarCola();
+    if (!leerCola().length){
+      try{ resumen = await conTiempo(srv('getResumen', implant), 20000); }
+      catch(e){
+        if (!esErrorDeRed(e)){ cargando(false); aviso(errMsg(e), 'error'); return; }
+        resumen = resumenLocal();
+      }
+    } else {
+      resumen = resumenLocal();
+    }
+    pintarResumen();
+    mostrar('modalResumen', true);
+    cargando(false);
+  }
+
+  // Resumen armado con lo guardado en el celular (cuando no hay señal)
+  function resumenLocal(){
+    const visitas = hoy.lista.filter(h => h.tipo === 'Visita').map(v => {
+      const det = v.detalle || [];
+      return {
+        idVisita: '', tienda: v.tienda, horaEntrada: v.horaEntrada, horaSalida: v.horaSalida,
+        duracion: v.duracion, coaching: v.coaching, ventas: det,
+        otras: Math.max(0, (v.ventas || 0) - det.length),
+        total: v.total || 0, piezas: v.piezas || 0
+      };
+    });
+    const comidas = hoy.lista.filter(h => h.tipo === 'Comida');
+    return {
+      local: true, visitas, comidas,
+      numVentas: visitas.reduce((s, x) => s + x.ventas.length + x.otras, 0),
+      numPiezas: visitas.reduce((s, x) => s + x.piezas, 0),
+      totalVentas: Math.round(visitas.reduce((s, x) => s + x.total, 0) * 100) / 100,
+      minutosComida: comidas.reduce((s, x) => s + (Number(x.duracion) || 0), 0),
+      abierto: hoy.abierto, finalizada: hoy.finalizada || ''
+    };
+  }
+
+  function cerrarResumen(){ mostrar('modalResumen', false); }
+
+  const horasTxt = (h) => h.horaSalida
+    ? `${esc(h.horaEntrada)} – ${esc(h.horaSalida)} · ${h.duracion} min`
+    : `${esc(h.horaEntrada)} – en curso`;
+
+  function pintarResumen(){
+    const r = resumen;
+    const fin = !!r.finalizada;
+    $('resumenSub').textContent = `${implant} · ${hoyTexto()}` + (fin ? ` · finalizada ${r.finalizada}` : '');
+    $('resumenTotal').textContent = pesos(r.totalVentas);
+
+    const cifras = `<div class="cifras">
+      <div class="cifra"><b>${r.visitas.length}</b><span>Tiendas</span></div>
+      <div class="cifra"><b>${r.numVentas}</b><span>Ventas</span></div>
+      <div class="cifra"><b>${r.numPiezas || 0}</b><span>Piezas</span></div>
+      <div class="cifra"><b>${r.minutosComida}</b><span>Min. comida</span></div></div>`;
+
+    const tiendas = r.visitas.length ? r.visitas.map((t, i) => {
+      const otras = t.otras ? `<li><span>${t.otras} ${t.otras === 1 ? 'venta' : 'ventas'} más<div class="s">El detalle se ve con señal</div></span><b></b></li>` : '';
+      const lista = (t.ventas.length || t.otras)
+        ? `<ul>${t.ventas.map(x => `<li><span>${esc(x.producto || x.sku)}<div class="s">SKU ${esc(x.sku)} · ${pzs(x.piezas)} × ${pesos(x.precio || (x.piezas ? x.monto / x.piezas : 0))}</div></span>
+             <b>${pesos(x.monto)}</b></li>`).join('')}${otras}</ul>
+           <div class="sub"><span>Subtotal · ${pzs(t.piezas)}</span><span>${pesos(t.total)}</span></div>`
+        : '<div class="sinv">Sin ventas registradas.</div>';
+      const puedeEditar = !r.local && !fin && t.idVisita && (t.ventas.length || t.horaSalida);
+      return `<div class="tiendaR">
+        <div class="cab"><div><div class="nom">${esc(t.tienda)}</div><div class="hrs">${horasTxt(t)}</div></div>
+          ${t.coaching ? `<span class="tag Coach">Coaching ${esc(t.coaching)}</span>` : ''}</div>
+        ${lista}
+        ${puedeEditar ? `<button class="btn sec editar" onclick="editarVisita(${i})">✏️ Editar ventas</button>` : ''}
+      </div>`;
+    }).join('') : '<div class="vacio">Hoy no registraste visitas a tiendas.</div>';
+
+    const comidas = r.comidas.length
+      ? `<div class="tiendaR"><div class="nom">🍽️ Comida</div>${r.comidas.map(c =>
+          `<div class="hrs">${horasTxt(c)}</div>`).join('')}</div>` : '';
+
+    $('resumenCuerpo').innerHTML = cifras + tiendas + comidas;
+
+    // Botón de confirmar
+    let nota = '';
+    if (r.local) nota = '📶 Sin señal: resumen con lo guardado en el celular. Para editar ventas se necesita señal.';
+    if (fin) nota = 'Tu jornada ya está finalizada.' + (r.local ? ' Se enviará al volver la señal.' : '');
+    else if (!hoy.iniciada) nota = 'Primero inicia tu jornada.';
+    else if (r.abierto) nota = r.abierto.tipo === 'Visita'
+      ? `Primero registra tu salida de ${r.abierto.tienda}.`
+      : 'Primero registra tu regreso de comida.';
+    $('resumenNota').textContent = nota;
+    mostrar('resumenNota', !!nota);
+    mostrar('btnConfirmarFin', !fin);
+    $('btnConfirmarFin').disabled = !!r.abierto || !hoy.iniciada;
+  }
+
+  function editarVisita(i){
+    const t = resumen.visitas[i];
+    abrirVentas({ idVisita: t.idVisita, tienda: t.tienda, ventas: t.ventas });
+  }
+
+  // Finalizar = palabra de fin del día + foto + GPS (se envía en enviar())
+  async function confirmarFin(){
+    if (hoy.coachJ === 'Sí' && !hoy.coachJHora &&
+        !(await preguntar('Marcaste que harías coaching en el CEDIS, pero no anexaste la evidencia.\n¿Finalizar así?', 'Finalizar sin evidencia', false, 'Volver'))) return;
+    if (!(await preguntar('¿Finalizar tu jornada de hoy?\nDespués ya no podrás registrar checks ni editar ventas.', 'Sí, finalizar'))) return;
+    iniciarCheck('FIN');
+  }
+
+  /* -------- Ventana de confirmación propia (en lugar de la del navegador) -------- */
+  function preguntar(texto, txtSi, peligro, txtNo){
+    return new Promise(res => {
+      $('preguntaTexto').textContent = texto;
+      const si = $('preguntaSi'), no = $('preguntaNo');
+      si.textContent = txtSi || 'Aceptar';
+      no.textContent = txtNo || 'Cancelar';
+      si.className = 'btn ' + (peligro ? 'bad' : '');
+      const cerrar = r => { si.onclick = no.onclick = null; mostrar('modalPregunta', false); res(r); };
+      si.onclick = () => cerrar(true);
+      no.onclick = () => cerrar(false);
+      mostrar('modalPregunta', true);
+    });
+  }
+
+  /* -------- Graduación de la visita abierta (se guarda en el celular) -------- */
+  const claveVisita = () => hoy.abierto ? hoy.abierto.tienda + '|' + hoy.abierto.horaEntrada : '';
+  function leerGrad(){
+    try{
+      const g = JSON.parse(localStorage.getItem('grad_' + implant) || '{}');
+      return g.clave === claveVisita() ? g : {};
+    }catch(e){ return {}; }
+  }
+  function guardarGrad(){
+    try{ localStorage.setItem('grad_' + implant, JSON.stringify({ clave: claveVisita(), g1: $('chkG1').checked, g2: $('chkG2').checked })); }catch(e){}
+  }
+
+  /* -------- CEDIS asignados al implant (LISTAS, columna B) -------- */
+  const cedisAsignados = () => ((datos.cedis || {})[implant] || []);
+  function pintarCedis(){
+    const lista = cedisAsignados();
+    const conLista = lista.length > 0;
+    mostrar('selCedis', conLista);
+    mostrar('fCedis', !conLista);
+    if (!conLista){ pintarRutas(); return; }
+    const antes = $('selCedis').value;
+    const ultimo = usados('cedis')[0];
+    $('selCedis').innerHTML = (lista.length > 1 ? '<option value="">Elige tu CEDIS…</option>' : '') +
+      lista.map(c => `<option>${esc(c)}</option>`).join('');
+    // Conserva lo elegido; si no, el último que usó (si está en su lista)
+    if (lista.includes(antes)) $('selCedis').value = antes;
+    else if (lista.includes(ultimo)) $('selCedis').value = ultimo;
+    pintarRutas();
+  }
+
+  /* -------- Rutas del implant en el CEDIS elegido (LISTAS, columna C) --------
+     Si el implant no tiene rutas para ese CEDIS en LISTAS, se escribe a mano. */
+  const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const cedisElegido = () => hoy.iniciada ? (hoy.cedis || '') :
+    (cedisAsignados().length ? $('selCedis').value : $('fCedis').value).trim();
+  const rutasDelImplant = () => ((datos.rutas || {})[implant] || []);
+  function rutasDisponibles(){
+    const c = norm(cedisElegido());
+    return [...new Set(rutasDelImplant().filter(x => !x.cedis || norm(x.cedis) === c).map(x => x.ruta))];
+  }
+  function pintarRutas(){
+    const sel = $('selRuta');
+    const lista = rutasDisponibles();
+    const sinCedis = !cedisElegido();
+    const conLista = lista.length > 0 || (sinCedis && rutasDelImplant().length > 0);
+    mostrar('selRuta', conLista);
+    mostrar('fRuta', !conLista);
+    if (!conLista) return;
+    if (sinCedis){
+      sel.innerHTML = '<option value="">Primero elige tu CEDIS</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    const antes = sel.value, ultimo = usados('ruta')[0];
+    sel.innerHTML = (lista.length > 1 ? '<option value="">Elige tu ruta…</option>' : '') +
+      lista.map(r => `<option>${esc(r)}</option>`).join('');
+    if (lista.includes(antes)) sel.value = antes;
+    else if (lista.includes(ultimo)) sel.value = ultimo;
+  }
+
+  /* -------- CEDIS y rutas usados en este celular (para sugerirlos) -------- */
+  function usados(tipo){
+    try{ return JSON.parse(localStorage.getItem(tipo + '_usados') || '[]'); }catch(e){ return []; }
+  }
+  function recordar(tipo, valor){
+    const lista = [valor].concat(usados(tipo).filter(x => x.toLowerCase() !== valor.toLowerCase())).slice(0, 10);
+    try{ localStorage.setItem(tipo + '_usados', JSON.stringify(lista)); }catch(e){}
+  }
+
+  /* -------- Checks -------- */
+  function iniciarCheck(accion){
+    const check = { accion, tienda: '', datos: {} };
+
+    // Inicio de jornada: el CEDIS es obligatorio
+    if (accion === 'INICIO'){
+      const conLista = cedisAsignados().length > 0;
+      check.cedis = (conLista ? $('selCedis').value : $('fCedis').value).trim();
+      if (!check.cedis){
+        aviso(conLista ? 'Elige tu CEDIS' : 'Escribe el nombre del CEDIS donde inicias', 'error');
+        $(conLista ? 'selCedis' : 'fCedis').focus(); return;
+      }
+    }
+
+    if (accion === 'COACHING_J') check.cedis = hoy.cedis || '';
+    // No dejar salir si marcó labor de venta pero no guardó ventas
+    if (accion === 'SALIDA' && $('chkVenta').checked && !(hoy.abierto && hoy.abierto.ventas > 0)){
+      aviso('Guarda tus ventas o desmarca "Labor de venta"', 'error');
+      return;
+    }
+
+    if (accion === 'ENTRADA'){
+      check.tienda = $('fTienda').value.trim();
+      if (!check.tienda){ aviso('Escribe el nombre de la tienda', 'error'); $('fTienda').focus(); return; }
+      const campos = datos.campos || [];
+      for (let i = 0; i < campos.length; i++){
+        const c = campos[i], v = $('campo' + i).value.trim();
+        if (!v){ aviso('Completa: ' + c.nombre, 'error'); return; }
+        if (c.tipo === 'cp' && !/^\d{5}$/.test(v)){ aviso(c.nombre + ' debe tener 5 dígitos', 'error'); return; }
+        check.datos[c.nombre] = v;
+      }
+      if (!(hoy.preventa && hoy.cp)){ aviso('Primero guarda tu ruta y código postal', 'error'); return; }
+    }
+
+    // Graduación: se manda con la salida (Sí / No)
+    if (accion === 'SALIDA'){
+      check.grad1 = $('chkG1').checked;
+      check.grad2 = $('chkG2').checked;
+    }
+
+    // Inicio y fin de jornada: primero se muestra la palabra del día y luego la cámara
+    if (accion === 'INICIO' || accion === 'FIN'){
+      mostrarPalabra(check);
+      return;
+    }
+    abrirCamara(check);
+  }
+
+  async function mostrarPalabra(check){
+    // Si cambió el día desde que se abrió la app, se piden las palabras nuevas
+    const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); // aaaa-mm-dd
+    if (!datos.palabras || datos.palabras.fecha !== fechaHoy){
+      cargando(true, 'Cargando…');
+      try{ datos.palabras = await srv('getPalabras'); }
+      catch(e){ cargando(false); aviso(errMsg(e), 'error'); return; }
+      cargando(false);
+    }
+    const esInicio = check.accion === 'INICIO';
+    check.palabra = esInicio ? datos.palabras.entrada : datos.palabras.salida;
+    checkPendiente = check;
+    $('palabraTitulo').textContent = esInicio ? 'Palabra de INICIO de jornada de hoy' : 'Palabra de FIN de jornada de hoy';
+    $('palabra').textContent = check.palabra;
+    mostrar('modalPalabra', true);
+  }
+
+  function cancelarPalabra(){
+    mostrar('modalPalabra', false);
+    checkPendiente = null;
+  }
+
+  // Se llama desde un toque del usuario (requisito del celular para abrir la cámara)
+  function abrirCamara(check){
+    mostrar('modalPalabra', false);
+    check = check || checkPendiente;
+    if (!check) return;
+
+    // La ubicación se empieza a pedir AHORA (mientras se toma la foto)
+    ubicacionPendiente = pedirUbicacion();
+    ubicacionPendiente.catch(() => {}); // el error se muestra después
+
+    const a = check.accion;
+    // Entrada y salida de tienda: solo GPS. Foto en inicio, fin y coaching.
+    const conFoto = a === 'INICIO' || a === 'FIN' || a === 'COACHING' || a === 'COACHING_J' ||
+      ((a === 'COMIDA_INI' || a === 'COMIDA_FIN') && datos.fotoEnComida);
+    if (!conFoto){ checkPendiente = null; enviar(check, null); return; }
+
+    checkPendiente = check;
+    const input = $('camara'); // siempre la cámara, nunca la galería
+    input.value = '';
+    input.click();
+  }
+
+  function fotoElegida(e){
+    const archivo = e.target.files[0];
+    const check = checkPendiente; checkPendiente = null;
+    if (!archivo || !check) return;
+    enviar(check, archivo);
+  }
+  $('camara').addEventListener('change', fotoElegida);
+
+  async function enviar(check, archivo){
+    const t0 = Date.now();
+    cargando(true, 'Obteniendo ubicación…');
+    try{
+      let pos;
+      try { pos = await ubicacionPendiente; }
+      catch(e){ pos = await pedirUbicacion(); } // segundo intento
+
+      let foto = null;
+      if (archivo){
+        cargando(true, 'Preparando foto…');
+        // En la foto: la tienda, o el CEDIS en inicio y fin de jornada
+        const tienda = check.tienda || check.cedis || (check.accion === 'FIN' ? hoy.cedis : '') ||
+          (hoy.abierto && hoy.abierto.tienda) || '';
+        const ahora = new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+        const marca = `${implant} · ${NOMBRES[check.accion]}${tienda ? ' · ' + tienda : ''}\n` +
+                      (check.palabra ? `Palabra: ${check.palabra}\n` : '') +
+                      `${ahora} · ${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}`;
+        foto = await procesarFoto(archivo, marca);
+      }
+
+      cargando(true, 'Guardando…');
+      const seg = () => Math.round((Date.now() - t0) / 1000);
+      const base = { implant, lat: pos.latitude, lng: pos.longitude, acc: pos.accuracy, foto, palabra: check.palabra || '' };
+
+      // Todo pasa por la fila de envíos: con señal se manda al instante; sin señal se guarda
+      const sinSenal = '📶 Guardado en el celular; se enviará al volver la señal';
+      if (check.accion === 'INICIO'){
+        const r = await operar('iniciarJornada', Object.assign(base, { cedis: check.cedis }), NOMBRES.INICIO,
+          () => aplicarLocal('INICIO', { cedis: check.cedis }));
+        recordar('cedis', check.cedis);
+        pintar();
+        aviso(r.enviado ? `✓ Jornada iniciada (${seg()} s)` : sinSenal, r.enviado ? '' : 'pendiente');
+        cargando(false);
+        preguntarCoachJ();
+      } else if (check.accion === 'COACHING_J'){
+        const r = await operar('coachingJornada', Object.assign(base, { hara: true }), NOMBRES.COACHING_J + ': evidencia',
+          () => aplicarLocal('COACHING_J', { hara: true, evidencia: true }));
+        pintar();
+        aviso(r.enviado ? `✓ Evidencia de coaching guardada (${seg()} s)` : sinSenal, r.enviado ? '' : 'pendiente');
+      } else if (check.accion === 'FIN'){
+        const r = await operar('finalizarJornada', base, NOMBRES.FIN, () => aplicarLocal('FIN'));
+        if (!(r.enviado && r.resp && r.resp.visitas)) resumen = resumenLocal();
+        pintar();
+        pintarResumen();
+        aviso(r.enviado ? '✓ Jornada finalizada. ¡Buen trabajo!' : sinSenal, r.enviado ? '' : 'pendiente');
+      } else {
+        const r = await operar('registrar', Object.assign(base, { accion: check.accion, tienda: check.tienda, datos: check.datos,
+            grad1: check.grad1, grad2: check.grad2 }),
+          NOMBRES[check.accion] + (check.tienda ? ' · ' + check.tienda : ''),
+          () => aplicarLocal(check.accion, { tienda: check.tienda }));
+        if (check.accion === 'ENTRADA') limpiarFormulario();
+        pintar();
+        // Se muestra cuánto tardó, para detectar si algo va lento
+        aviso(r.enviado ? `✓ ${NOMBRES[check.accion]} registrada (${seg()} s)` : sinSenal, r.enviado ? '' : 'pendiente');
+      }
+      if (navigator.vibrate) navigator.vibrate(80);
+    }catch(e){
+      aviso(errMsg(e), 'error');
+    }
+    cargando(false);
+  }
+
+  /* -------- Fila de envíos (modo sin señal) --------
+     Cada registro se guarda primero en el celular y luego se manda al servidor.
+     Si no hay señal, se queda en la fila y se reintenta solo. Lleva la hora en
+     que pasó (tCliente) y un id único (opId) para que el servidor no lo duplique. */
+  const COLA = 'cola_envios_v1';
+  let enviando = null; // promesa del envío en curso (si hay)
+
+  function leerCola(){ try{ return JSON.parse(localStorage.getItem(COLA) || '[]'); }catch(e){ return []; } }
+  function guardarCola(c){ try{ localStorage.setItem(COLA, JSON.stringify(c)); return true; }catch(e){ return false; } }
+  const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  const fechaHoy = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  const horaLocal = () => new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false });
+
+  function esErrorDeRed(e){
+    return !navigator.onLine || /network|http 0|connection|conexi|failed to fetch|load failed|timeout|tiempo|err_/i.test(errMsg(e));
+  }
+  // Si el servidor no contesta en ese tiempo, se trata como "sin señal"
+  function conTiempo(promesa, ms){
+    return Promise.race([promesa, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout de red')), ms))]);
+  }
+
+  // Estado del día guardado en el celular, por implant
+  function guardarHoyLocal(){
+    if (!implant) return;
+    try{ localStorage.setItem('hoy_' + implant, JSON.stringify({ fecha: fechaHoy(), hoy })); }catch(e){}
+  }
+  function leerHoyLocal(n){
+    try{ const o = JSON.parse(localStorage.getItem('hoy_' + n) || 'null'); return o && o.fecha === fechaHoy() ? o.hoy : null; }
+    catch(e){ return null; }
+  }
+
+  /** Guarda el registro en la fila, actualiza la pantalla y trata de enviarlo. */
+  async function operar(fn, payload, etiqueta, aplicar){
+    payload.opId = nuevoId();
+    payload.tCliente = Date.now();
+    const cola = leerCola();
+    cola.push({ fn, payload, etiqueta, creado: payload.tCliente });
+    if (!guardarCola(cola)) throw new Error('La memoria del celular está llena. Libera espacio e intenta de nuevo.');
+    if (aplicar) aplicar();
+    pintarPendientes();
+    const resp = await procesarCola();
+    const enviado = !leerCola().some(x => x.payload.opId === payload.opId);
+    return { enviado, resp: enviado ? resp : null };
+  }
+
+  /** Envía la fila en orden. Se detiene si no hay señal o si el servidor rechaza un registro. */
+  function procesarCola(manual){
+    // Si ya se está enviando, se espera ese mismo envío (también manda lo recién agregado)
+    if (!enviando) enviando = enviarFila(manual).finally(() => { enviando = null; pintarPendientes(); });
+    return enviando;
+  }
+
+  async function enviarFila(manual){
+    let resp = null;
+    try{
+      while (true){
+        const cola = leerCola();
+        if (!cola.length) break;
+        const item = cola[0];
+        if (item.error && !manual) break; // uno rechazado espera a que el usuario decida
+        try{
+          resp = await conTiempo(srv(item.fn, item.payload), 45000);
+          const resto = leerCola();
+          resto.shift();
+          guardarCola(resto);
+        }catch(e){
+          if (esErrorDeRed(e)) break; // sin señal: se reintenta después
+          const c = leerCola();
+          c[0].error = errMsg(e);
+          guardarCola(c);
+          break;
+        }
+        manual = false;
+      }
+      // Con la fila vacía, lo del servidor manda
+      if (!leerCola().length && resp){
+        if (resp.visitas){ resumen = resp; hoy = resp.hoy; if (!$('modalResumen').classList.contains('hidden')) pintarResumen(); }
+        else hoy = resp;
+        pintar();
+      }
+    } catch (e) { /* nunca se pierde nada: lo pendiente sigue en la fila */ }
+    return resp;
+  }
+
+  function pintarPendientes(){
+    const cola = leerCola();
+    mostrar('cardPendientes', cola.length > 0);
+    if (!cola.length) return;
+    const err = cola[0].error;
+    $('txtPendientes').innerHTML = err
+      ? `⚠️ <b>No se pudo guardar:</b> ${esc(cola[0].etiqueta || '')}<br>${esc(err)}` +
+        (cola.length > 1 ? `<br><span class="nota">Hay ${cola.length - 1} más esperando detrás.</span>` : '')
+      : `📶 <b>${cola.length} ${cola.length === 1 ? 'registro guardado' : 'registros guardados'} en el celular.</b><br>` +
+        `Se enviarán solos cuando vuelva la señal. No borres los datos de la app.`;
+    $('btnEnviarAhora').textContent = err ? 'Reintentar' : 'Enviar ahora';
+    mostrar('btnDescartar', !!err);
+  }
+
+  async function descartarFallido(){
+    const cola = leerCola();
+    if (!cola.length) return;
+    if (!(await preguntar(`¿Descartar "${cola[0].etiqueta}"? No se guardará en el Sheet.`, 'Sí, descartar', true))) return;
+    cola.shift();
+    guardarCola(cola);
+    pintarPendientes();
+    await procesarCola();
+    // Vuelve a tomar el estado real del servidor
+    if (!leerCola().length){
+      try{ hoy = await conTiempo(srv('getHoy', implant), 20000); pintar(); }catch(e){}
+    }
+  }
+
+  // Reintentos: al volver la señal, cada 20 s y al regresar a la app
+  window.addEventListener('online', () => procesarCola());
+  setInterval(() => { if (leerCola().length) procesarCola(); }, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && leerCola().length) procesarCola(); });
+
+  /* -------- Cambios en pantalla sin esperar al servidor -------- */
+  const aMin = h => { const m = /^(\d{1,2}):(\d{2})/.exec(h || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  function minutosEntre(h1, h2){
+    const a = aMin(h1), b = aMin(h2);
+    return a === null || b === null ? '' : Math.max(0, b - a);
+  }
+  function abiertoEnLista(){
+    for (let i = hoy.lista.length - 1; i >= 0; i--){ if (!hoy.lista[i].horaSalida) return hoy.lista[i]; }
+    return null;
+  }
+  function aplicarLocal(accion, x){
+    x = x || {};
+    const h = horaLocal();
+    const abierto = abiertoEnLista();
+    switch (accion){
+      case 'INICIO': hoy.iniciada = h; hoy.cedis = x.cedis; hoy.preventa = ''; hoy.cp = ''; hoy.coachJ = ''; hoy.coachJHora = ''; break;
+      case 'RUTA': hoy.preventa = x.ruta; hoy.cp = x.cp; break;
+      case 'FIN': hoy.finalizada = h; break;
+      case 'ENTRADA':
+      case 'COMIDA_INI': {
+        const v = { tipo: accion === 'ENTRADA' ? 'Visita' : 'Comida', tienda: x.tienda || '', horaEntrada: h,
+          horaSalida: '', duracion: '', coaching: '', ventas: 0, total: 0, piezas: 0, detalle: [] };
+        hoy.lista.push(v);
+        break;
+      }
+      case 'SALIDA':
+      case 'COMIDA_FIN':
+        if (abierto){ abierto.horaSalida = h; abierto.duracion = minutosEntre(abierto.horaEntrada, h); }
+        break;
+      case 'COACHING': if (abierto) abierto.coaching = h; break;
+      case 'COACHING_J':
+        hoy.coachJ = x.hara ? 'Sí' : 'No';
+        if (x.evidencia) hoy.coachJHora = h;
+        break;
+      case 'VENTAS':
+        if (abierto){
+          const d = x.detalle || [];
+          abierto.detalle = (abierto.detalle || []).concat(d);
+          abierto.ventas = (abierto.ventas || 0) + d.length;
+          abierto.total = Math.round(((abierto.total || 0) + d.reduce((s, y) => s + y.monto, 0)) * 100) / 100;
+          abierto.piezas = (abierto.piezas || 0) + d.reduce((s, y) => s + y.piezas, 0);
+        }
+        break;
+    }
+    hoy.abierto = abiertoEnLista();
+  }
+
+  /* -------- Ubicación --------
+     El GPS se mantiene encendido mientras la app está abierta y se guarda la
+     última ubicación. Así, al registrar, ya está lista y no hay que esperar. */
+  let ultimaPos = null; // { coords, t }
+  let vigilando = false;
+
+  function vigilarUbicacion(){
+    if (vigilando || !navigator.geolocation) return;
+    vigilando = true;
+    navigator.geolocation.watchPosition(
+      p => { ultimaPos = { coords: p.coords, t: Date.now() }; },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 60000 }
+    );
+  }
+
+  const fresca = (maxSeg, maxMetros) => ultimaPos &&
+    (Date.now() - ultimaPos.t) < maxSeg * 1000 &&
+    (!maxMetros || ultimaPos.coords.accuracy <= maxMetros);
+
+  function intento(opciones){
+    return new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(
+        p => { ultimaPos = { coords: p.coords, t: Date.now() }; res(p.coords); }, rej, opciones));
+  }
+
+  async function pedirUbicacion(){
+    if (!navigator.geolocation) throw new Error('Este celular no permite obtener ubicación.');
+    // 1) Ya hay una ubicación reciente y buena: se usa al instante
+    if (fresca(120, 150)) return ultimaPos.coords;
+    try {
+      // 2) GPS preciso, máximo 8 segundos
+      return await intento({ enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+    } catch (e) {
+      if (e && e.code === 1) throw new Error('Permite el acceso a tu ubicación para poder registrar.');
+    }
+    try {
+      // 3) Ubicación por red (menos precisa pero rápida), máximo 6 segundos
+      return await intento({ enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 });
+    } catch (e) { /* sigue */ }
+    // 4) Última opción: la más reciente de los últimos 10 minutos
+    if (fresca(600)) return ultimaPos.coords;
+    throw new Error('No se pudo obtener la ubicación. Activa el GPS e intenta de nuevo.');
+  }
+
+  // Reduce la foto (~200 KB) y le estampa implant, hora y coordenadas
+  function procesarFoto(file, texto){
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const max = 1024; // suficiente para ver la tienda y la palabra
+        const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const fs = Math.max(16, Math.round(w / 34));
+        const lineas = texto.split('\n');
+        const alto = lineas.length * fs * 1.35 + fs * 0.7;
+        ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, h - alto, w, alto);
+        ctx.fillStyle = '#fff'; ctx.font = `bold ${fs}px sans-serif`;
+        lineas.forEach((l, i) => ctx.fillText(l, fs * 0.5, h - alto + fs * 1.25 + i * fs * 1.35, w - fs));
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg', 0.6).split(',')[1]); // ~100 KB
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('No se pudo leer la foto.')); };
+      img.src = url;
+    });
+  }
+
+  /* -------- App instalable --------
+     El "service worker" guarda la pantalla en el celular para que abra sin señal. */
+  if (!EN_APPS_SCRIPT && 'serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  let promptInstalar = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    promptInstalar = e;
+    mostrar('cardInstalar', true);
+  });
+  window.addEventListener('appinstalled', () => { promptInstalar = null; mostrar('cardInstalar', false); });
+  async function instalarApp(){
+    if (!promptInstalar) return;
+    promptInstalar.prompt();
+    try{ await promptInstalar.userChoice; }catch(e){}
+    promptInstalar = null;
+    mostrar('cardInstalar', false);
+  }
+
+  iniciar();
+</script>
+</body>
+</html>
