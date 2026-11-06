@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 32 · va junto con Codigo.gs versión 32
+<!-- APP DE CHECKS · versión 33 · va junto con Codigo.gs versión 33
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -212,7 +212,7 @@
     <!-- Registros guardados en el celular (sin señal) -->
     <div class="card hidden" id="cardPendientes">
       <div id="txtPendientes" style="font-size:15px"></div>
-      <button class="btn sec" id="btnEnviarAhora" onclick="procesarCola(true)">Enviar ahora</button>
+      <button class="btn sec" id="btnEnviarAhora" onclick="enviarAhora()">Enviar ahora</button>
       <button class="btn bad hidden" id="btnDescartar" onclick="descartarFallido()">Descartar este registro</button>
     </div>
     <!-- Inicio de jornada (foto + palabra del día) -->
@@ -401,7 +401,7 @@
 
   /* ======== CONEXIÓN CON EL SERVIDOR ========
      App instalable: pega aquí el link /exec de tu implementación de Apps Script. */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxrCZ0jt22yhi-eyC7TcTffP0vCDluCRPpIzWSBQZXu5bGk9OgroSD74WkKqoRvm5BHqQ/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyCIOXVuxsNtj9-JWKbVwtJNIqOwixDtKbvPrloEFkHU9u6O6BIi_ChjsrcivECFLgHBg/exec';
 
   const EN_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
   function srv(fn, ...args){
@@ -467,7 +467,7 @@
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 32;
+  const VERSION_APP = 33;
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
     // Link viejo: invita a pasarse a la app instalable
@@ -490,9 +490,9 @@
   function sesionValida(n){
     if (!datos.conPin) return true;
     const s = leerSesion();
-    return !!(s && s.implant === n && s.token && s.fecha === fechaHoy());
+    return !!(s && norm(s.implant) === norm(n) && s.token && s.fecha === fechaHoy());
   }
-  const token = () => { const s = leerSesion(); return (s && s.implant === implant) ? s.token : ''; };
+  const token = () => { const s = leerSesion(); return (s && norm(s.implant) === norm(implant)) ? s.token : ''; };
   const esErrorSesion = e => /^(Error:\s*)?SESION:/.test(e && e.message ? e.message : String(e));
 
   // Se acabó la sesión (otro día o cambió el PIN): vuelve a la pantalla de entrada
@@ -562,6 +562,7 @@
         $('fPin').value = ''; return;
       }
       cargando(false);
+      s.t = Date.now();
       guardarLocal(SESION, JSON.stringify(s));
       guardarLocal('usuario', s.usuario);
       renovarTokenEnCola(s);
@@ -571,22 +572,29 @@
     entrar(n);
   }
 
-  // Los registros guardados sin señal de hoy toman el token nuevo (por si cambió el PIN)
+  // Los registros guardados en el celular de ese implant toman la sesión nueva (por si cambió el PIN o es otro día)
   function renovarTokenEnCola(s){
     const cola = leerCola();
     let cambio = false;
     cola.forEach(x => {
-      const dia = new Date(x.payload.tCliente || 0).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
-      if (x.payload.implant === s.implant && dia === s.fecha){ x.payload.token = s.token; cambio = true; if (/sesi[oó]n|PIN/i.test(x.error || '')) delete x.error; }
+      if (norm(x.payload.implant) !== norm(s.implant)) return;
+      x.payload.token = s.token;
+      x.payload.implant = s.implant;
+      if (x.sesion){ delete x.sesion; delete x.error; }
+      cambio = true;
     });
     if (cambio) guardarCola(cola);
   }
 
   async function cambiarImplant(){
-    if (!(await preguntar('¿Cambiar de implant?' + (datos.conPin ? '\nSe cerrará tu sesión.' : ''), 'Sí, cambiar'))) return;
+    const pend = leerCola().filter(x => norm(x.payload.implant) === norm(implant)).length;
+    const txt = datos.conPin ? `¿Salir de la sesión de ${implant}?` : '¿Cambiar de implant?';
+    const nota = pend ? `\n\nTienes ${pend} ${pend === 1 ? 'registro' : 'registros'} en el celular: se enviarán solos aunque entre otro usuario.` : '';
+    if (!(await preguntar(txt + nota, datos.conPin ? 'Sí, salir' : 'Sí, cambiar'))) return;
     guardarLocal('implant', null);
     guardarLocal(SESION, null);
     implant = null;
+    $('fUsuario').value = '';
     mostrarSeleccion();
   }
 
@@ -594,7 +602,8 @@
     implant = n;
     vigilarUbicacion(); // enciende el GPS desde que abre la app
     mostrar('pImplant', false); mostrar('pCheck', true);
-    mostrar('btnCambiar', !datos.conPin); // con usuario y PIN no hay "Cambiar": la sesión dura el día
+    $('btnCambiar').textContent = datos.conPin ? 'Salir' : 'Cambiar';
+    mostrar('btnCambiar', true);
     $('titulo').textContent = n;
     $('subtitulo').textContent = hoyTexto();
     pintarCamposExtra();
@@ -1271,7 +1280,7 @@
 
   async function mostrarPalabra(check){
     // Si cambió el día desde que se abrió la app, se piden las palabras nuevas
-    const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); // aaaa-mm-dd
+    const fechaHoy = fechaMX(); // aaaa-mm-dd
     if (!datos.palabras || datos.palabras.fecha !== fechaHoy){
       cargando(true, 'Cargando…');
       try{ datos.palabras = await srv('getPalabras'); }
@@ -1394,7 +1403,13 @@
   function leerCola(){ try{ return JSON.parse(localStorage.getItem(COLA) || '[]'); }catch(e){ return []; } }
   function guardarCola(c){ try{ localStorage.setItem(COLA, JSON.stringify(c)); return true; }catch(e){ return false; } }
   const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  const fechaHoy = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  function fechaMX(d){
+    const p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(d || new Date()).forEach(x => p[x.type] = x.value);
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+  const fechaHoy = () => fechaMX();
   const horaLocal = () => new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false });
 
   function esErrorDeRed(e){
@@ -1432,7 +1447,9 @@
     const resp = await procesarCola();
     // Si al enviar se venció la sesión, ya se mostró la pantalla del PIN; el registro queda guardado
     if (!implant) throw new Error('Tu registro quedó guardado en el celular. Entra con tu usuario y PIN y se enviará solo.');
-    const enviado = !leerCola().some(x => x.payload.opId === payload.opId);
+    const mio = leerCola().find(x => x.payload.opId === payload.opId);
+    if (mio && mio.error) throw new Error(mio.error + ' (quedó guardado en el celular; revisa el aviso de arriba)');
+    const enviado = !mio;
     return { enviado, resp: enviado ? resp : null };
   }
 
@@ -1444,30 +1461,45 @@
   }
 
   async function enviarFila(manual){
-    let resp = null;
+    let resp = null, respDe = '', cerrarMiSesion = '';
+    const detenidos = new Set(); // implants con un registro detenido: lo suyo espera, lo de otros sigue
     try{
       while (true){
         const cola = leerCola();
-        if (!cola.length) break;
-        const item = cola[0];
-        if (item.error && !manual) break; // uno rechazado espera a que el usuario decida
+        const item = cola.find(x => {
+          const n = norm(x.payload.implant);
+          if (detenidos.has(n)) return false;
+          if (x.error && !manual){ detenidos.add(n); return false; } // rechazado: espera a que decidan
+          return true;
+        });
+        if (!item) break;
+        const id = item.payload.opId;
         try{
           resp = await conTiempo(srv(item.fn, item.payload), 45000);
-          const resto = leerCola();
-          resto.shift();
-          guardarCola(resto);
+          respDe = item.payload.implant;
+          guardarCola(leerCola().filter(x => x.payload.opId !== id));
         }catch(e){
           if (esErrorDeRed(e)) break; // sin señal: se reintenta después
-          if (esErrorSesion(e)){ if (implant) pedirLogin(errMsg(e)); break; } // se envía al volver a entrar
-          const c = leerCola();
-          c[0].error = errMsg(e);
-          guardarCola(c);
-          break;
+          // Rechazado (o sin sesión válida): se marca y NO se cierra la sesión de nadie
+          const c = leerCola(), x = c.find(y => y.payload.opId === id);
+          if (x){
+            x.error = esErrorSesion(e) ? `Esperando a que ${x.payload.implant} entre con su usuario y PIN.` : errMsg(e);
+            if (esErrorSesion(e)) x.sesion = true;
+            guardarCola(c);
+          }
+          // Si es la sesión de quien está usando la app (p. ej. le cambiaron el PIN), se le pide entrar otra vez.
+          // Recién entrado no se le saca (evita que se repita sin fin).
+          const s = leerSesion();
+          if (esErrorSesion(e) && implant && norm(item.payload.implant) === norm(implant) &&
+              s && item.payload.token === s.token && Date.now() - (s.t || 0) > 120000) cerrarMiSesion = errMsg(e);
+          detenidos.add(norm(item.payload.implant));
         }
         manual = false;
       }
-      // Con la fila vacía, lo del servidor manda
-      if (!leerCola().length && resp){
+      if (cerrarMiSesion){ pedirLogin(cerrarMiSesion); return resp; }
+      // Sin pendientes de este implant, lo del servidor manda (solo si la respuesta es suya)
+      const suyos = leerCola().some(x => norm(x.payload.implant) === norm(implant));
+      if (resp && implant && norm(respDe) === norm(implant) && !suyos){
         if (resp.visitas){ resumen = resp; hoy = resp.hoy; if (!$('modalResumen').classList.contains('hidden')) pintarResumen(); }
         else hoy = resp;
         pintar();
@@ -1476,25 +1508,46 @@
     return resp;
   }
 
+  // Botón "Enviar ahora": muestra que está trabajando y cuántos se mandaron
+  async function enviarAhora(){
+    const btn = $('btnEnviarAhora');
+    if (btn.disabled) return;
+    const antes = leerCola().length;
+    btn.disabled = true;
+    btn.textContent = '⏳ Enviando…';
+    cargando(true, 'Enviando registros…');
+    try{ await procesarCola(true); } catch(e){}
+    cargando(false);
+    btn.disabled = false;
+    pintarPendientes();
+    const quedan = leerCola().length, enviados = antes - quedan;
+    if (!quedan) aviso(`✓ Listo: ${enviados === 1 ? 'se envió 1 registro' : 'se enviaron ' + enviados + ' registros'}`);
+    else if (enviados > 0) aviso(`✓ Se enviaron ${enviados}; quedan ${quedan} en el celular`, 'pendiente');
+    else if (leerCola().some(x => x.error)) aviso('Hay un registro que no se pudo guardar; revisa el aviso', 'error');
+    else aviso('📶 No hay señal suficiente todavía; se enviarán solos', 'pendiente');
+  }
+
   function pintarPendientes(){
     const cola = leerCola();
     mostrar('cardPendientes', cola.length > 0);
     if (!cola.length) return;
-    const err = cola[0].error;
-    $('txtPendientes').innerHTML = err
-      ? `⚠️ <b>No se pudo guardar:</b> ${esc(cola[0].etiqueta || '')}<br>${esc(err)}` +
-        (cola.length > 1 ? `<br><span class="nota">Hay ${cola.length - 1} más esperando detrás.</span>` : '')
+    const fallo = cola.find(x => x.error);
+    const de = x => (implant && norm(x.payload.implant) !== norm(implant)) ? ` <span class="nota">(de ${esc(x.payload.implant)})</span>` : '';
+    $('txtPendientes').innerHTML = fallo
+      ? `⚠️ <b>No se pudo guardar:</b> ${esc(fallo.etiqueta || '')}${de(fallo)}<br>${esc(fallo.error)}` +
+        (cola.length > 1 ? `<br><span class="nota">Hay ${cola.length - 1} más en el celular.</span>` : '')
       : `📶 <b>${cola.length} ${cola.length === 1 ? 'registro guardado' : 'registros guardados'} en el celular.</b><br>` +
         `Se enviarán solos cuando vuelva la señal. No borres los datos de la app.`;
-    $('btnEnviarAhora').textContent = err ? 'Reintentar' : 'Enviar ahora';
-    mostrar('btnDescartar', !!err);
+    if (!$('btnEnviarAhora').disabled) $('btnEnviarAhora').textContent = fallo ? 'Reintentar' : 'Enviar ahora';
+    mostrar('btnDescartar', !!fallo);
   }
 
   async function descartarFallido(){
     const cola = leerCola();
-    if (!cola.length) return;
-    if (!(await preguntar(`¿Descartar "${cola[0].etiqueta}"? No se guardará en el Sheet.`, 'Sí, descartar', true))) return;
-    cola.shift();
+    const i = cola.findIndex(x => x.error);
+    if (i < 0) return;
+    if (!(await preguntar(`¿Descartar "${cola[i].etiqueta}"${cola[i].payload.implant !== implant ? ' de ' + cola[i].payload.implant : ''}? No se guardará en el Sheet.`, 'Sí, descartar', true))) return;
+    cola.splice(i, 1);
     guardarCola(cola);
     pintarPendientes();
     await procesarCola();
