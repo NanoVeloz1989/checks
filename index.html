@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 33 · va junto con Codigo.gs versión 33
+<!-- APP DE CHECKS · versión 35 · va junto con Codigo.gs versión 35
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -401,7 +401,7 @@
 
   /* ======== CONEXIÓN CON EL SERVIDOR ========
      App instalable: pega aquí el link /exec de tu implementación de Apps Script. */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyCIOXVuxsNtj9-JWKbVwtJNIqOwixDtKbvPrloEFkHU9u6O6BIi_ChjsrcivECFLgHBg/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzjENm6h02bDJZfumvm-iIHYB11v4DvuJZScZ5X2IG4CfbBBJgIfJrQvxCHvT1l-mZ9jg/exec';
 
   const EN_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
   function srv(fn, ...args){
@@ -467,7 +467,7 @@
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 33;
+  const VERSION_APP = 35;
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
     // Link viejo: invita a pasarse a la app instalable
@@ -479,7 +479,9 @@
   function arrancar(){
     revisarVersion();
     const guardado = leerLocal('implant');
-    if (guardado && datos.implants.includes(guardado) && sesionValida(guardado)){ entrar(guardado); return; }
+    // Con usuario y PIN basta la sesión del día (aunque la lista guardada en el celular sea vieja o no haya señal)
+    const conocido = datos.conPin ? !!leerSesion() : datos.implants.includes(guardado);
+    if (guardado && conocido && sesionValida(guardado)){ entrar(guardado); return; }
     mostrarSeleccion(guardado);
   }
 
@@ -567,6 +569,7 @@
       guardarLocal('usuario', s.usuario);
       renovarTokenEnCola(s);
       n = s.implant;
+      actualizarDatos(); // trae sus CEDIS y rutas aunque el usuario sea nuevo
     } else if (!n){ aviso('Elige tu nombre', 'error'); return; }
     guardarLocal('implant', n);
     entrar(n);
@@ -614,7 +617,7 @@
       hoy = local; pintar(); cargando(false);
       procesarCola();
     } else {
-      try{ hoy = await srv('getHoy', n, token()); pintar(); }
+      try{ hoy = await conTiempo(srv('getHoy', n, token()), 15000); pintar(); }
       catch(e){
         if (esErrorSesion(e)){ cargando(false); pedirLogin(errMsg(e)); return; }
         if (local && esErrorDeRed(e)){ hoy = local; pintar(); aviso('📶 Sin señal: se muestra lo guardado en el celular', 'pendiente'); }
@@ -1192,7 +1195,7 @@
 
   /* -------- Rutas del implant en el CEDIS elegido (LISTAS, columna C) --------
      Si el implant no tiene rutas para ese CEDIS en LISTAS, se escribe a mano. */
-  const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
   const cedisElegido = () => hoy.iniciada ? (hoy.cedis || '') :
     (cedisAsignados().length ? $('selCedis').value : $('fCedis').value).trim();
   const rutasDelImplant = () => ((datos.rutas || {})[implant] || []);
