@@ -1,6 +1,6 @@
 /* Guarda la pantalla en el celular para que la app abra sin señal.
    Al subir una versión nueva de index.html, cambia el número de CACHE. */
-const CACHE = 'checks-v31';
+const CACHE = 'checks-v32';
 const ARCHIVOS = ['./', 'index.html', 'manifest.json', 'icono-192.png', 'icono-512.png', 'icono-180.png'];
 
 self.addEventListener('install', e => {
