@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 38 · va junto con Codigo.gs versión 38
+<!-- APP DE CHECKS · versión 39 · va junto con Codigo.gs versión 39
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -234,7 +234,14 @@
   <!-- Aviso: esta pantalla es más vieja que el servidor -->
   <div class="card hidden" id="avisoVersion" style="background:#fee2e2;color:#991b1b">
     <b>⚠️ Hay una versión nueva de la app.</b><br>
-    Cierra la app por completo (deslízala en apps recientes) y vuelve a abrirla.
+    Toca "Actualizar". Si sigue saliendo, cierra la app por completo (deslízala en apps recientes) y vuelve a abrirla con señal.
+    <button class="btn" onclick="actualizarApp()">🔄 Actualizar</button>
+  </div>
+
+  <!-- Llegó una versión nueva de la pantalla (app instalable) -->
+  <div class="card hidden" id="avisoActualizar" style="background:#dbeafe;color:#1e3a8a">
+    <b>🔄 Hay una versión nueva de la app.</b>
+    <button class="btn" onclick="actualizarApp()">Actualizar</button>
   </div>
 
   <!-- Link viejo → app nueva -->
@@ -384,6 +391,7 @@
     <div id="supLista"></div>
     <div id="supDet" class="hidden"></div>
   </section>
+  <div class="nota" id="pieVersion" style="text-align:center;margin:18px 0 8px"></div>
 </main>
 <div id="visor" class="hidden" onclick="mostrar('visor', false)"><img id="visorImg" alt="Foto"></div>
 
@@ -478,7 +486,7 @@
 
   /* ======== CONEXIÓN CON EL SERVIDOR ========
      App instalable: pega aquí el link /exec de tu implementación de Apps Script. */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyIquLVqXCb56GF0IXXz758fPAHi_hn9db34u7VTDHB4JIXubu0jJZ5F5Hl_rNewF01Bg/exec';
+  const API_URL = 'PEGA_AQUI_TU_LINK_EXEC';
 
   const EN_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
   // Modo sin señal (lo prende el implant): no se intenta nada con el servidor, salvo entrar con usuario y PIN
@@ -547,7 +555,7 @@
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 38;
+  const VERSION_APP = 39;
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
     // Link viejo: invita a pasarse a la app instalable
@@ -2040,8 +2048,26 @@
 
   /* -------- App instalable --------
      El "service worker" guarda la pantalla en el celular para que abra sin señal. */
+  $('pieVersion').textContent = 'Checks · versión ' + VERSION_APP;
   if (!EN_APPS_SCRIPT && 'serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    const habiaVersion = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      // Busca versión nueva al abrir, al regresar a la app y cada 30 min
+      const revisar = () => { if (navigator.onLine && !modoSinSenal()) reg.update().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
+      setInterval(revisar, 30 * 60 * 1000);
+      revisar();
+    }).catch(() => {});
+    // La versión nueva ya quedó guardada en el celular: se ofrece recargar
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (habiaVersion) mostrar('avisoActualizar', true); });
+  }
+  async function actualizarApp(){
+    if (leerCola().length) aviso('Tus registros pendientes se conservan', 'pendiente');
+    try{
+      const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+      if (reg) await conTiempo(reg.update(), 8000);
+    }catch(e){}
+    location.reload();
   }
   let promptInstalar = null;
   window.addEventListener('beforeinstallprompt', e => {
