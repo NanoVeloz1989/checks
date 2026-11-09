@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 35 · va junto con Codigo.gs versión 35
+<!-- APP DE CHECKS · versión 38 · va junto con Codigo.gs versión 38
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -98,6 +98,13 @@
     padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
   #modalVentas .pie .btn{margin-top:8px}
   .buscador{position:sticky;top:0;background:var(--bg);padding-bottom:8px;z-index:1}
+  .filtros{background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+  .filtros select{margin-top:6px}
+  .filtros .fila{display:flex;gap:8px;align-items:center}
+  .filtros .fila select{flex:1;min-width:0}
+  .filtros .mas{flex:0 0 auto;background:var(--ok);color:#fff;border:0;border-radius:10px;padding:12px 14px;font-weight:700;margin-top:6px}
+  .filtros .mas:disabled{opacity:.4}
+  .o-busca{font-size:13px;color:var(--muted);margin:2px 2px 6px}
   .resultados{list-style:none;margin:0;padding:0;background:#fff;border-radius:12px;overflow:hidden}
   .resultados li{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
   .resultados li:first-child{border-top:0}
@@ -147,6 +154,41 @@
     border-top:1px solid var(--line);margin-top:4px}
   .tiendaR .editar{margin-top:10px;padding:12px;font-size:15px}
   .tiendaR .sinv{font-size:14px;color:var(--muted);margin-top:8px}
+  /* Interruptor "Modo sin señal" */
+  .modo{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .modo.on{background:#fff7ed;border:2px solid #fb923c}
+  .switch{appearance:none;-webkit-appearance:none;width:54px;height:30px;border-radius:30px;background:#cbd5e1;
+          position:relative;flex:none;cursor:pointer;transition:background .2s;margin:0}
+  .switch::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+          background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s}
+  .switch:checked{background:#f97316}
+  .switch:checked::after{left:27px}
+  .pill{display:inline-block;background:#f97316;color:#fff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;margin-top:4px}
+  /* Supervisión */
+  .sup-tot{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+  .sup-p{cursor:pointer}
+  .sup-p .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .sup-p .nom{font-weight:700;font-size:16px}
+  .sup-p .lin{font-size:13px;color:var(--muted);margin-top:4px}
+  .sup-p .cif{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .sup-p .cif span{background:#f1f5f9;border-radius:8px;padding:4px 8px;font-size:13px}
+  .sup-p.sin{opacity:.6}
+  .t-ok{background:#dcfce7;color:#166534}.t-no{background:#fee2e2;color:#991b1b}.t-gris{background:#e2e8f0;color:#334155}.t-az{background:#dbeafe;color:#1e40af}
+  .fotos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .foto{background:#f1f5f9;border-radius:12px;overflow:hidden;font-size:12px}
+  .foto .ph{aspect-ratio:3/4;display:grid;place-items:center;color:var(--muted);background:#e2e8f0}
+  .foto img{width:100%;display:block;cursor:zoom-in}
+  .foto .pie{padding:6px 8px}
+  .vta{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .vta th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:4px 2px}
+  .vta td{border-bottom:1px solid var(--line);padding:6px 2px;vertical-align:top}
+  .vta td.n,.vta th.n{text-align:right;white-space:nowrap}
+  .vta .s{font-size:11px;color:var(--muted)}
+  .det h3{margin:0 0 6px;font-size:15px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:14px}
+  .kv b{color:var(--muted);font-weight:600}
+  #visor{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:60;display:grid;place-items:center;padding:10px}
+  #visor img{max-width:100%;max-height:100%}
   .hidden{display:none !important}
 </style>
 </head>
@@ -157,6 +199,7 @@
     <div>
       <h1 id="titulo">Checks</h1>
       <div class="sub" id="subtitulo">Cargando…</div>
+      <span class="pill hidden" id="indModo">📴 Modo sin señal</span>
     </div>
     <button class="link hidden" id="btnCambiar" onclick="cambiarImplant()">Cambiar</button>
   </div>
@@ -209,6 +252,15 @@
   </div>
 
   <section id="pCheck" class="hidden">
+    <!-- Modo sin señal: en zonas sin cobertura no intenta enviar (no se traba) y guarda todo en el celular -->
+    <div class="card modo" id="cardModo">
+      <div>
+        <b>📴 Modo sin señal</b>
+        <div class="nota" id="txtModo">Actívalo en zonas sin cobertura: todo se guarda en el celular sin intentar enviar.</div>
+      </div>
+      <input type="checkbox" class="switch" id="chkModo" aria-label="Modo sin señal" onchange="cambiarModo(this.checked)">
+    </div>
+
     <!-- Registros guardados en el celular (sin señal) -->
     <div class="card hidden" id="cardPendientes">
       <div id="txtPendientes" style="font-size:15px"></div>
@@ -318,7 +370,22 @@
       <ul class="hist" id="historial"></ul>
     </div>
   </section>
+
+  <!-- Módulo de supervisión (ROL = SUPERVISOR en USUARIOS) -->
+  <section id="pSup" class="hidden">
+    <div class="card">
+      <h2>👔 Supervisión</h2>
+      <label for="supFecha">Fecha</label>
+      <input id="supFecha" type="date" onchange="supCargar()">
+      <label for="supPersona">Personal</label>
+      <select id="supPersona" onchange="supElegir(this.value)"><option value="">Todo el personal</option></select>
+      <button class="btn sec" onclick="supCargar()">🔄 Actualizar</button>
+    </div>
+    <div id="supLista"></div>
+    <div id="supDet" class="hidden"></div>
+  </section>
 </main>
+<div id="visor" class="hidden" onclick="mostrar('visor', false)"><img id="visorImg" alt="Foto"></div>
 
 <!-- Palabra al azar antes de la foto de entrada/salida -->
 <div id="modalPalabra" class="modal hidden">
@@ -338,6 +405,16 @@
     <div class="sub" id="ventasTienda"></div>
   </div>
   <div class="cuerpo">
+    <!-- Elegir por Categoría → Marca → Producto (si la hoja SKU las tiene) -->
+    <div class="filtros hidden" id="filtrosVenta">
+      <select id="selCat" onchange="filtroCat()"></select>
+      <select id="selMarca" onchange="filtroMarca()"></select>
+      <div class="fila">
+        <select id="selProd" onchange="$('btnAgregarProd').disabled = !this.value"></select>
+        <button class="mas" id="btnAgregarProd" onclick="agregarDeLista()" disabled>+ Agregar</button>
+      </div>
+    </div>
+    <div class="o-busca hidden" id="oBusca">…o búscalo por nombre o SKU:</div>
     <div class="buscador">
       <input id="fBuscar" type="search" autocomplete="off" placeholder="🔍 Buscar producto o SKU" oninput="buscarSku()">
     </div>
@@ -401,10 +478,13 @@
 
   /* ======== CONEXIÓN CON EL SERVIDOR ========
      App instalable: pega aquí el link /exec de tu implementación de Apps Script. */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzjENm6h02bDJZfumvm-iIHYB11v4DvuJZScZ5X2IG4CfbBBJgIfJrQvxCHvT1l-mZ9jg/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwClbpoiJAFpYezMYDqL7AIK0jwZ0BQ3G5kLlWVdCgDhphL3uDbASWepTjMHL5He1Gbtw/exec';
 
   const EN_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
+  // Modo sin señal (lo prende el implant): no se intenta nada con el servidor, salvo entrar con usuario y PIN
+  const modoSinSenal = () => { try{ return localStorage.getItem('modo_sin_senal') === '1'; }catch(e){ return false; } };
   function srv(fn, ...args){
+    if (modoSinSenal() && fn !== 'login') return Promise.reject(new Error('Modo sin señal activado: sin conexión'));
     if (EN_APPS_SCRIPT){
       return new Promise((res, rej) =>
         google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
@@ -467,7 +547,7 @@
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 35;
+  const VERSION_APP = 38;
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
     // Link viejo: invita a pasarse a la app instalable
@@ -481,7 +561,11 @@
     const guardado = leerLocal('implant');
     // Con usuario y PIN basta la sesión del día (aunque la lista guardada en el celular sea vieja o no haya señal)
     const conocido = datos.conPin ? !!leerSesion() : datos.implants.includes(guardado);
-    if (guardado && conocido && sesionValida(guardado)){ entrar(guardado); return; }
+    if (guardado && conocido && sesionValida(guardado)){
+      const s = leerSesion();
+      if (s && s.rol === 'SUPERVISOR') entrarSupervisor(guardado); else entrar(guardado);
+      return;
+    }
     mostrarSeleccion(guardado);
   }
 
@@ -534,7 +618,7 @@
   }
 
   function mostrarSeleccion(elegido){
-    mostrar('pCheck', false); mostrar('btnCambiar', false);
+    mostrar('pCheck', false); mostrar('pSup', false); mostrar('btnCambiar', false);
     $('titulo').textContent = 'Checks';
     $('subtitulo').textContent = hoyTexto();
     $('selImplant').innerHTML = '<option value="">Selecciona…</option>' +
@@ -567,8 +651,9 @@
       s.t = Date.now();
       guardarLocal(SESION, JSON.stringify(s));
       guardarLocal('usuario', s.usuario);
-      renovarTokenEnCola(s);
       n = s.implant;
+      if (s.rol === 'SUPERVISOR'){ guardarLocal('implant', n); entrarSupervisor(n); return; }
+      renovarTokenEnCola(s);
       actualizarDatos(); // trae sus CEDIS y rutas aunque el usuario sea nuevo
     } else if (!n){ aviso('Elige tu nombre', 'error'); return; }
     guardarLocal('implant', n);
@@ -590,7 +675,7 @@
   }
 
   async function cambiarImplant(){
-    const pend = leerCola().filter(x => norm(x.payload.implant) === norm(implant)).length;
+    const pend = implant ? leerCola().filter(x => norm(x.payload.implant) === norm(implant)).length : 0;
     const txt = datos.conPin ? `¿Salir de la sesión de ${implant}?` : '¿Cambiar de implant?';
     const nota = pend ? `\n\nTienes ${pend} ${pend === 1 ? 'registro' : 'registros'} en el celular: se enviarán solos aunque entre otro usuario.` : '';
     if (!(await preguntar(txt + nota, datos.conPin ? 'Sí, salir' : 'Sí, cambiar'))) return;
@@ -604,7 +689,7 @@
   async function entrar(n){
     implant = n;
     vigilarUbicacion(); // enciende el GPS desde que abre la app
-    mostrar('pImplant', false); mostrar('pCheck', true);
+    mostrar('pImplant', false); mostrar('pSup', false); mostrar('pCheck', true);
     $('btnCambiar').textContent = datos.conPin ? 'Salir' : 'Cambiar';
     mostrar('btnCambiar', true);
     $('titulo').textContent = n;
@@ -697,10 +782,14 @@
     mostrar('inicioHecho', iniciada);
     $('horaInicio').textContent = hoy.iniciada || '';
     mostrar('formInicio', !iniciada && !fin);
-    $('cedisInicio').textContent = (hoy.cedis ? ` en ${hoy.cedis}` : '') + (hoy.preventa ? ` · Ruta: ${hoy.preventa}` : '') +
+    $('cedisInicio').textContent = (hoy.cedis ? ` en ${hoy.cedis}` : '') + (hoy.incid === 'Sí' ? ' · ⚠️ con incidencia/retardo' : '') +
+      (hoy.preventa ? ` · Ruta: ${hoy.preventa}` : '') +
       (hoy.cp ? ` · CP: ${hoy.cp}` : '');
     const faltaRuta = iniciada && !fin && !(hoy.preventa && hoy.cp);
-    mostrar('formRuta', faltaRuta);
+    // Orden: inicio → coaching (Sí/No) → ruta y CP
+    mostrar('formRuta', faltaRuta && !!hoy.coachJ);
+    if (iniciada && !fin && !hoy.coachJ && $('modalPregunta').classList.contains('hidden') &&
+        $('modalPalabra').classList.contains('hidden') && !checkPendiente) setTimeout(preguntarCoachJ, 300);
     pintarCoachJ(iniciada, fin);
     // Sugiere los CEDIS y rutas que este celular ya usó (cuando se escriben a mano)
     $('sugCedis').innerHTML = usados('cedis').map(c => `<option value="${esc(c)}">`).join('');
@@ -782,15 +871,22 @@
       const r = await operar('coachingJornada', { implant, hara }, NOMBRES.COACHING_J + (hara ? ': Sí' : ': No'),
         () => aplicarLocal('COACHING_J', { hara }));
       pintar();
-      aviso(r.enviado ? (hara ? '✓ Coaching: Sí. Anexa la evidencia cuando la tengas' : '✓ Coaching: No')
+      aviso(r.enviado ? (hara ? '✓ Coaching: Sí' : '✓ Coaching: No')
         : '📶 Guardado en el celular; se enviará al volver la señal', r.enviado ? '' : 'pendiente');
+      if (hara && !hoy.coachJHora){
+        await preguntar('📷 No olvides subir tu evidencia de coaching.\n\nCuando la tengas, marca la casilla "Anexa evidencia de coaching".', 'Entendido', false, null);
+      }
     }catch(e){ aviso(errMsg(e), 'error'); pintar(); }
   }
   function coachJMarcado(chk){ guardarCoachJ(chk.checked); }
 
   // Justo después de iniciar jornada
+  let preguntandoCoach = false;
   async function preguntarCoachJ(){
-    const si = await preguntar('¿Harás coaching hoy en el CEDIS?', 'Sí, haré coaching', false, 'No');
+    if (preguntandoCoach) return;
+    preguntandoCoach = true;
+    const si = await preguntar('¿Harás coaching hoy en el CEDIS?', 'Sí', false, 'No');
+    preguntandoCoach = false;
     guardarCoachJ(si);
   }
 
@@ -817,8 +913,54 @@
   let skusActualizados = false; // ya se pidió el catálogo al Sheet en esta sesión
 
   function prepararSkus(lista){
-    return lista.map(x => ({ sku: x.sku, producto: x.producto, busca: sinAcentos(x.sku + ' ' + x.producto) }));
+    return lista.map(x => ({ sku: x.sku, producto: x.producto, categoria: x.categoria || '', marca: x.marca || '',
+      piezasCaja: Number(x.piezasCaja) || 0,
+      busca: sinAcentos([x.sku, x.producto, x.categoria, x.marca].filter(Boolean).join(' ')) }));
   }
+
+  /* -------- Categoría → Marca → Producto -------- */
+  const conCategorias = () => !!(skus && skus.some(x => x.categoria || x.marca));
+  const unicos = arr => [...new Set(arr)].sort((a, b) => a.localeCompare(b, 'es'));
+  const SIN = '(Sin marca)';
+  function opciones(id, titulo, valores, valorDe){
+    $(id).innerHTML = `<option value="">${titulo}</option>` +
+      valores.map(v => `<option value="${esc(valorDe ? valorDe(v) : v)}">${esc(v.texto || v)}</option>`).join('');
+  }
+  function pintarFiltros(){
+    const con = conCategorias();
+    mostrar('filtrosVenta', con); mostrar('oBusca', con);
+    if (!con) return;
+    opciones('selCat', 'Categoría…', unicos(skus.map(x => x.categoria || '(Sin categoría)')));
+    filtroCat();
+  }
+  const enCat = () => { const c = $('selCat').value; return skus.filter(x => (x.categoria || '(Sin categoría)') === c); };
+  function filtroCat(){
+    const c = $('selCat').value;
+    $('selMarca').disabled = !c;
+    opciones('selMarca', c ? 'Marca…' : 'Primero elige categoría', c ? unicos(enCat().map(x => x.marca || SIN)) : []);
+    filtroMarca();
+  }
+  function filtroMarca(){
+    const m = $('selMarca').value;
+    const lista = m ? enCat().filter(x => (x.marca || SIN) === m).sort((a, b) => (a.producto || a.sku).localeCompare(b.producto || b.sku, 'es')) : [];
+    $('selProd').disabled = !m;
+    opciones('selProd', m ? 'Producto…' : 'Primero elige marca',
+      lista.map(x => ({ texto: (x.producto || x.sku) + (x.piezasCaja ? ` (${x.piezasCaja} pzs/caja)` : ''), i: skus.indexOf(x) })), v => v.i);
+    $('btnAgregarProd').disabled = true;
+  }
+  function agregarDeLista(){
+    const i = $('selProd').value;
+    if (i === '') return;
+    agregarSku(Number(i));
+    $('selProd').value = ''; $('btnAgregarProd').disabled = true;
+  }
+  // Cajas = piezas ÷ piezas en caja (3 decimales)
+  function cajasDe(x){
+    const c = skus && skus.find(y => y.sku === x.sku);
+    const pc = c ? c.piezasCaja : 0, pz = aPiezas(x.piezas);
+    return pc > 0 && pz >= 1 ? Math.round(pz / pc * 1000) / 1000 : null;
+  }
+  const cajasTxt = n => (n === null || n === undefined || n === '') ? '' : `${Number(n).toLocaleString('es-MX', { maximumFractionDigits: 3 })} ${Number(n) === 1 ? 'caja' : 'cajas'}`;
 
   // Actualiza el catálogo por detrás (se llama al entrar a la app)
   function precargarSkus(){
@@ -858,6 +1000,7 @@
     $('ventasTitulo').textContent = edicion ? '✏️ Editar ventas' : '🛒 Labor de venta';
     $('ventasTienda').textContent = edicion ? edicion.tienda : (hoy.abierto ? hoy.abierto.tienda : '');
     $('fBuscar').value = '';
+    pintarFiltros();
     buscarSku();
     pintarCarrito();
     mostrar('modalVentas', true);
@@ -890,12 +1033,14 @@
   function buscarSku(){
     const q = sinAcentos($('fBuscar').value.trim());
     const palabras = q.split(/\s+/).filter(Boolean);
+    // Con categorías, la lista solo aparece al escribir (lo demás se elige arriba)
+    if (!palabras.length && conCategorias()){ $('resultados').innerHTML = ''; return; }
     const lista = palabras.length
       ? skus.filter(x => palabras.every(p => x.busca.includes(p)))
       : skus;
     const muestra = lista.slice(0, 30);
     $('resultados').innerHTML = muestra.length
-      ? muestra.map(x => `<li><div class="p">${esc(x.producto || x.sku)}<div class="s">SKU ${esc(x.sku)}</div></div>
+      ? muestra.map(x => `<li><div class="p">${esc(x.producto || x.sku)}<div class="s">SKU ${esc(x.sku)}${x.marca ? ' · ' + esc(x.marca) : ''}${x.piezasCaja ? ` · ${x.piezasCaja} pzs/caja` : ''}</div></div>
           <button class="mas" onclick="agregarSku(${skus.indexOf(x)})">+ Agregar</button></li>`).join('') +
         (lista.length > 30 ? `<li class="vacio">…y ${lista.length - 30} más. Escribe más para filtrar.</li>` : '')
       : '<li class="vacio">No se encontró ningún producto.</li>';
@@ -907,6 +1052,7 @@
     if (!x) return;
     leerMontos();
     carrito.push({ sku: x.sku, producto: x.producto, precio: '', piezas: '1' });
+    $('fBuscar').value = ''; buscarSku();
     pintarCarrito();
     // Enfoca el precio recién agregado (piezas ya trae 1)
     const inputs = document.querySelectorAll('#carrito .monto input.din-in');
@@ -953,7 +1099,7 @@
     $('contador').textContent = `${yaGuardadas() + carrito.length} de ${MAX_VENTAS}`;
     $('carrito').innerHTML = carrito.length
       ? carrito.map((x, i) => `<div class="item">
-          <div><div class="p">${esc(x.producto || x.sku)}</div><div class="s">SKU ${esc(x.sku)}</div></div>
+          <div><div class="p">${esc(x.producto || x.sku)}</div><div class="s">SKU ${esc(x.sku)}${datosSku(x)}</div></div>
           <button class="quitar" onclick="quitarSku(${i})" aria-label="Quitar">✕</button>
           <div class="monto">
             <div><label>Piezas</label>
@@ -964,9 +1110,15 @@
                 <input class="din-in" type="text" inputmode="decimal" placeholder="0.00" value="${esc(x.precio)}" oninput="actualizarTotal()">
               </div></div>
           </div>
-          <div class="subt">Monto: <b class="subt-n">$0.00</b></div></div>`).join('')
+          <div class="subt">Monto: <b class="subt-n">$0.00</b> <span class="cajas-n"></span></div></div>`).join('')
       : '<div class="vacio">Busca un producto y toca <b>+ Agregar</b>.</div>';
     actualizarTotal();
+  }
+
+  function datosSku(x){
+    const c = skus && skus.find(y => y.sku === x.sku);
+    if (!c) return '';
+    return [c.categoria, c.marca].filter(Boolean).map(t => ' · ' + esc(t)).join('') + (c.piezasCaja ? ` · ${c.piezasCaja} pzs/caja` : '');
   }
 
   function actualizarTotal(){
@@ -975,10 +1127,15 @@
     document.querySelectorAll('#carrito .item .subt-n').forEach((el, i) => {
       if (carrito[i]) el.textContent = pesos(montoDe(carrito[i]));
     });
+    document.querySelectorAll('#carrito .item .cajas-n').forEach((el, i) => {
+      const c = carrito[i] ? cajasDe(carrito[i]) : null;
+      el.textContent = c === null ? '' : `· ${cajasTxt(c)}`;
+    });
     const total = carrito.reduce((s, x) => s + montoDe(x), 0);
     const piezas = carrito.reduce((s, x) => s + (aPiezas(x.piezas) || 0), 0);
+    const cajas = Math.round(carrito.reduce((s, x) => s + (cajasDe(x) || 0), 0) * 1000) / 1000;
     $('totalCarrito').textContent = pesos(total);
-    $('piezasCarrito').textContent = carrito.length ? `· ${pzs(piezas)}` : '';
+    $('piezasCarrito').textContent = carrito.length ? `· ${pzs(piezas)}${cajas ? ' · ' + cajasTxt(cajas) : ''}` : '';
   }
 
   async function guardarVentas(){
@@ -1025,7 +1182,7 @@
     cargando(true, 'Guardando ventas…');
     try{
       const detalle = carrito.map((x, i) => ({ sku: x.sku, producto: x.producto, piezas: ventas[i].piezas,
-                                                precio: ventas[i].precio, monto: ventas[i].monto }));
+                                                precio: ventas[i].precio, monto: ventas[i].monto, cajas: cajasDe(x) }));
       const r = await operar('registrarVentas', { implant, ventas }, 'Ventas', () => aplicarLocal('VENTAS', { detalle }));
       carrito = [];
       mostrar('modalVentas', false);
@@ -1067,7 +1224,8 @@
         idVisita: '', tienda: v.tienda, horaEntrada: v.horaEntrada, horaSalida: v.horaSalida,
         duracion: v.duracion, coaching: v.coaching, ventas: det,
         otras: Math.max(0, (v.ventas || 0) - det.length),
-        total: v.total || 0, piezas: v.piezas || 0
+        total: v.total || 0, piezas: v.piezas || 0,
+        cajas: Math.round(det.reduce((t, y) => t + (Number(y.cajas) || 0), 0) * 1000) / 1000
       };
     });
     const comidas = hoy.lista.filter(h => h.tipo === 'Comida');
@@ -1102,9 +1260,9 @@
     const tiendas = r.visitas.length ? r.visitas.map((t, i) => {
       const otras = t.otras ? `<li><span>${t.otras} ${t.otras === 1 ? 'venta' : 'ventas'} más<div class="s">El detalle se ve con señal</div></span><b></b></li>` : '';
       const lista = (t.ventas.length || t.otras)
-        ? `<ul>${t.ventas.map(x => `<li><span>${esc(x.producto || x.sku)}<div class="s">SKU ${esc(x.sku)} · ${pzs(x.piezas)} × ${pesos(x.precio || (x.piezas ? x.monto / x.piezas : 0))}</div></span>
+        ? `<ul>${t.ventas.map(x => `<li><span>${esc(x.producto || x.sku)}<div class="s">SKU ${esc(x.sku)} · ${pzs(x.piezas)} × ${pesos(x.precio || (x.piezas ? x.monto / x.piezas : 0))}${x.cajas ? ' · ' + cajasTxt(x.cajas) : ''}</div></span>
              <b>${pesos(x.monto)}</b></li>`).join('')}${otras}</ul>
-           <div class="sub"><span>Subtotal · ${pzs(t.piezas)}</span><span>${pesos(t.total)}</span></div>`
+           <div class="sub"><span>Subtotal · ${pzs(t.piezas)}${t.cajas ? ' · ' + cajasTxt(t.cajas) : ''}</span><span>${pesos(t.total)}</span></div>`
         : '<div class="sinv">Sin ventas registradas.</div>';
       const puedeEditar = !r.local && !fin && t.idVisita && (t.ventas.length || t.horaSalida);
       return `<div class="tiendaR">
@@ -1149,15 +1307,17 @@
   }
 
   /* -------- Ventana de confirmación propia (en lugar de la del navegador) -------- */
-  function preguntar(texto, txtSi, peligro, txtNo){
+  // alSi: se ejecuta en el mismo toque de "Sí" (el celular solo abre la cámara desde un toque)
+  function preguntar(texto, txtSi, peligro, txtNo, alSi){
     return new Promise(res => {
       $('preguntaTexto').textContent = texto;
       const si = $('preguntaSi'), no = $('preguntaNo');
       si.textContent = txtSi || 'Aceptar';
       no.textContent = txtNo || 'Cancelar';
+      mostrar('preguntaNo', txtNo !== null); // txtNo = null: solo un botón (aviso)
       si.className = 'btn ' + (peligro ? 'bad' : '');
       const cerrar = r => { si.onclick = no.onclick = null; mostrar('modalPregunta', false); res(r); };
-      si.onclick = () => cerrar(true);
+      si.onclick = () => { if (alSi) alSi(); cerrar(true); };
       no.onclick = () => cerrar(false);
       mostrar('modalPregunta', true);
     });
@@ -1273,12 +1433,38 @@
       check.grad2 = $('chkG2').checked;
     }
 
-    // Inicio y fin de jornada: primero se muestra la palabra del día y luego la cámara
+    // Inicio: primero "¿incidencia o retardo?" (con foto si es Sí), luego palabra del día y selfie
+    if (accion === 'INICIO'){ preguntarIncidencia(check); return; }
+    // Fin de jornada: palabra del día y luego la cámara
     if (accion === 'INICIO' || accion === 'FIN'){
       mostrarPalabra(check);
       return;
     }
     abrirCamara(check);
+  }
+
+  /* -------- ¿Incidencia o retardo? (antes de iniciar jornada) -------- */
+  async function preguntarIncidencia(check){
+    const si = await preguntar('¿Tuviste alguna incidencia o retardo?', 'Sí', false, 'No');
+    check.incidencia = si;
+    check.fotoIncidencia = '';
+    if (!si){ mostrarPalabra(check); return; }
+    const tomo = await preguntar('Toma una foto de la incidencia o retardo (por ejemplo: el tráfico, la unidad o un comprobante).',
+      '📷 Tomar foto', false, 'Cancelar', () => {
+        checkPendiente = { accion: 'INCIDENCIA', inicio: check };
+        const input = $('camara'); input.setAttribute('capture', 'environment'); input.value = ''; input.click();
+      });
+    if (!tomo) aviso('Inicio de jornada cancelado. Tócalo otra vez cuando estés listo.', 'pendiente');
+  }
+  async function incidenciaElegida(check, archivo){
+    cargando(true, 'Preparando foto…');
+    try{
+      const ahora = new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+      check.fotoIncidencia = await procesarFoto(archivo, `${implant} · Incidencia o retardo${check.cedis ? ' · ' + check.cedis : ''}\n${ahora}`);
+    }catch(e){ cargando(false); aviso('No se pudo leer la foto. Intenta otra vez.', 'error'); return; }
+    cargando(false);
+    aviso('✓ Foto de la incidencia lista. Ahora tu selfie con la palabra del día.');
+    mostrarPalabra(check); // sigue el inicio normal
   }
 
   async function mostrarPalabra(check){
@@ -1321,6 +1507,8 @@
 
     checkPendiente = check;
     const input = $('camara'); // siempre la cámara, nunca la galería
+    // Inicio de jornada: selfie (cámara frontal); lo demás, cámara trasera
+    input.setAttribute('capture', a === 'INICIO' ? 'user' : 'environment');
     input.value = '';
     input.click();
   }
@@ -1329,6 +1517,7 @@
     const archivo = e.target.files[0];
     const check = checkPendiente; checkPendiente = null;
     if (!archivo || !check) return;
+    if (check.accion === 'INCIDENCIA'){ incidenciaElegida(check.inicio, archivo); return; }
     enviar(check, archivo);
   }
   $('camara').addEventListener('change', fotoElegida);
@@ -1361,8 +1550,9 @@
       // Todo pasa por la fila de envíos: con señal se manda al instante; sin señal se guarda
       const sinSenal = '📶 Guardado en el celular; se enviará al volver la señal';
       if (check.accion === 'INICIO'){
-        const r = await operar('iniciarJornada', Object.assign(base, { cedis: check.cedis }), NOMBRES.INICIO,
-          () => aplicarLocal('INICIO', { cedis: check.cedis }));
+        const r = await operar('iniciarJornada',
+          Object.assign(base, { cedis: check.cedis, incidencia: !!check.incidencia, fotoIncidencia: check.fotoIncidencia || '' }), NOMBRES.INICIO,
+          () => aplicarLocal('INICIO', { cedis: check.cedis, incid: check.incidencia ? 'Sí' : 'No' }));
         recordar('cedis', check.cedis);
         pintar();
         aviso(r.enviado ? `✓ Jornada iniciada (${seg()} s)` : sinSenal, r.enviado ? '' : 'pendiente');
@@ -1511,10 +1701,174 @@
     return resp;
   }
 
+  /* ======================= SUPERVISIÓN ======================= */
+  let sup = { dia: null, det: null, fotos: {} };
+  function entrarSupervisor(n){
+    implant = n;
+    if (modoSinSenal()){ guardarLocal('modo_sin_senal', null); pintarModo(); } // la supervisión necesita señal
+    mostrar('pImplant', false); mostrar('pCheck', false); mostrar('pSup', true);
+    $('btnCambiar').textContent = 'Salir'; mostrar('btnCambiar', true);
+    $('titulo').textContent = 'Supervisión';
+    $('subtitulo').textContent = n;
+    if (!$('supFecha').value) $('supFecha').value = fechaHoy();
+    $('supFecha').max = fechaHoy();
+    supCargar();
+  }
+  const fechaLarga = f => { const [a, m, d] = f.split('-').map(Number);
+    return new Date(a, m - 1, d).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }); };
+
+  async function supCargar(){
+    const fecha = $('supFecha').value || fechaHoy();
+    const persona = $('supPersona').value;
+    cargando(true, 'Cargando personal…');
+    try{ sup.dia = await conTiempo(srv('supDia', implant, token(), fecha), 45000); }
+    catch(e){
+      cargando(false);
+      if (esErrorSesion(e)){ pedirLogin(errMsg(e)); return; }
+      aviso(esErrorDeRed(e) ? '📶 La supervisión necesita señal' : errMsg(e), 'error'); return;
+    }
+    cargando(false);
+    const p = sup.dia.personal;
+    $('supPersona').innerHTML = '<option value="">Todo el personal</option>' +
+      p.map(x => `<option>${esc(x.implant)}</option>`).join('');
+    if (persona && p.some(x => x.implant === persona)){ $('supPersona').value = persona; supElegir(persona); }
+    else { $('supPersona').value = ''; supPintarLista(); }
+  }
+
+  function supPintarLista(){
+    mostrar('supDet', false); mostrar('supLista', true);
+    const p = sup.dia.personal, f = sup.dia.fecha;
+    const ini = p.filter(x => x.inicio).length;
+    const tiendas = p.reduce((s, x) => s + x.tiendas, 0), ventas = p.reduce((s, x) => s + x.ventas, 0);
+    const monto = p.reduce((s, x) => s + x.monto, 0);
+    $('supLista').innerHTML = `<div class="nota" style="margin:0 2px 8px">${esc(fechaLarga(f))}</div>
+      <div class="sup-tot">
+        <div class="cifra"><b>${ini}/${p.length}</b><span>Iniciaron</span></div>
+        <div class="cifra"><b>${tiendas}</b><span>Tiendas</span></div>
+        <div class="cifra"><b>${ventas}</b><span>Ventas · ${pesos(monto)}</span></div>
+      </div>` +
+      p.map((x, i) => `<div class="card sup-p ${x.inicio ? '' : 'sin'}" onclick="supElegir(sup.dia.personal[${i}].implant)">
+        <div class="top"><div class="nom">${esc(x.implant)}</div>
+          ${x.inicio ? `<span class="tag ${x.incidencia === 'Sí' ? 't-no' : 't-ok'}">Entrada ${esc(x.inicio)}${x.incidencia === 'Sí' ? ' ⚠️' : ''}</span>` : '<span class="tag t-gris">Sin jornada</span>'}</div>
+        ${x.inicio ? `<div class="lin">📍 ${esc(x.cedis || '—')}${x.ruta ? ' · Ruta ' + esc(x.ruta) : ''}${x.fin ? ' · Fin ' + esc(x.fin) : ' · <b>Jornada abierta</b>'}</div>
+        <div class="cif">
+          ${x.incidencia === 'Sí' ? '<span>⚠️ Incidencia o retardo</span>' : ''}
+          <span>Coaching: ${x.coaching === 'Sí' ? (x.evidencia ? '✅ Sí' : '⚠️ Sí, sin evidencia') : x.coaching === 'No' ? 'No' : '—'}</span>
+          <span>🏪 ${x.tiendas} ${x.tiendas === 1 ? 'tienda' : 'tiendas'}${x.enCurso ? ' (1 en curso)' : ''}</span>
+          <span>🛒 ${x.ventas} ${x.ventas === 1 ? 'venta' : 'ventas'} · ${pesos(x.monto)}${x.cajas ? ' · ' + cajasTxt(x.cajas) : ''}</span>
+        </div>` : ''}
+      </div>`).join('');
+  }
+
+  async function supElegir(quien){
+    $('supPersona').value = quien || '';
+    if (!quien){ supPintarLista(); return; }
+    cargando(true, 'Cargando detalle…');
+    try{ sup.det = await conTiempo(srv('supDetalle', implant, token(), sup.dia.fecha, quien), 45000); }
+    catch(e){
+      cargando(false);
+      if (esErrorSesion(e)){ pedirLogin(errMsg(e)); return; }
+      aviso(esErrorDeRed(e) ? '📶 La supervisión necesita señal' : errMsg(e), 'error'); return;
+    }
+    cargando(false);
+    supPintarDetalle();
+    window.scrollTo(0, 0);
+  }
+
+  function supPintarDetalle(){
+    const d = sup.det, j = d.jornada, t = d.totales;
+    mostrar('supLista', false); mostrar('supDet', true);
+    const kv = (k, v) => v ? `<b>${k}</b><span>${v}</span>` : '';
+    const mapa = (url, txt) => url ? ` · <a href="${esc(url)}" target="_blank" rel="noopener">${txt}</a>` : '';
+    const cab = `<div class="card det">
+      <button class="btn sec" style="margin-top:0" onclick="supElegir('')">← Todo el personal</button>
+      <h2 style="margin-top:12px">${esc(d.implant)}</h2>
+      <div class="nota" style="margin-bottom:8px">${esc(fechaLarga(d.fecha))}</div>
+      ${j ? `<div class="kv">
+        ${kv('Entrada', esc(j.inicio) + mapa(j.mapaInicio, '📍 mapa'))}
+        ${kv('Fin', j.fin ? esc(j.fin) + mapa(j.mapaFin, '📍 mapa') : '<span class="tag t-az">Jornada abierta</span>')}
+        ${kv('Incidencia', j.incidencia === 'Sí' ? '⚠️ Sí (ver foto)' : esc(j.incidencia))}
+        ${kv('CEDIS', esc(j.cedis))}${kv('Ruta', esc(j.ruta))}${kv('CP', esc(j.cp))}
+        ${kv('Coaching', j.coaching === 'Sí' ? (j.horaCoaching ? '✅ Sí · evidencia ' + esc(j.horaCoaching) : '⚠️ Sí, sin evidencia') : esc(j.coaching || '—'))}
+        ${kv('Comida', j.comida ? esc(j.comida) + ' min' : '')}
+        ${kv('ID jornada', esc(j.idJornada))}
+      </div>` : '<div class="vacio">No inició jornada este día.</div>'}
+      <div class="cifras" style="margin-top:12px">
+        <div class="cifra"><b>${t.tiendas}</b><span>Tiendas</span></div>
+        <div class="cifra"><b>${t.ventas}</b><span>Ventas</span></div>
+        <div class="cifra"><b>${t.piezas}</b><span>Piezas</span></div>
+        <div class="cifra"><b>${t.cajas ? Number(t.cajas).toLocaleString('es-MX', { maximumFractionDigits: 2 }) : 0}</b><span>Cajas</span></div>
+      </div>
+      <div class="totalv"><span>Total vendido</span><span>${pesos(t.monto)}</span></div>
+    </div>`;
+
+    const fotos = j && j.fotos.length ? `<div class="card det"><h3>📷 Fotos</h3><div class="fotos">${j.fotos.map(f =>
+      `<div class="foto"><div class="ph" id="ph_${esc(f.id)}">Cargando…</div>
+        <div class="pie"><b>${esc(f.titulo)}</b>${f.hora ? ' · ' + esc(f.hora) : ''}</div></div>`).join('')}</div></div>` : '';
+
+    const visitas = d.visitas.length ? d.visitas.map(v => `<div class="card det">
+      <h3>🏪 ${esc(v.tienda)}</h3>
+      <div class="nota">${esc(v.entrada)} – ${v.salida ? esc(v.salida) + ' · ' + v.minutos + ' min' : 'en curso'}${mapa(v.mapa, '📍 mapa')}</div>
+      <div class="nota">${v.datos.map(x => esc(x.nombre) + ': ' + esc(x.valor)).concat(v.cp ? ['CP ' + esc(v.cp)] : [])
+        .concat(v.grad1 ? ['3°–12° (RTD): ' + esc(v.grad1), '13°–45°: ' + esc(v.grad2)] : []).join(' · ')}</div>
+      ${v.ventas.length ? `<table class="vta"><tr><th>Producto</th><th class="n">Pzs</th><th class="n">Cajas</th><th class="n">Monto</th></tr>
+        ${v.ventas.map(x => `<tr><td>${esc(x.producto || x.sku)}<div class="s">${[x.categoria, x.marca, 'SKU ' + x.sku].filter(Boolean).map(esc).join(' · ')} · ${pesos(x.precio)} c/u</div></td>
+          <td class="n">${x.piezas}</td><td class="n">${x.cajas === '' || x.cajas == null ? '—' : Number(x.cajas).toLocaleString('es-MX', { maximumFractionDigits: 3 })}</td><td class="n">${pesos(x.monto)}</td></tr>`).join('')}
+        <tr><td><b>Subtotal</b></td><td class="n"><b>${v.piezas}</b></td><td class="n"><b>${v.cajas ? Number(v.cajas).toLocaleString('es-MX', { maximumFractionDigits: 3 }) : '—'}</b></td><td class="n"><b>${pesos(v.total)}</b></td></tr></table>`
+        : '<div class="sinv" style="margin-top:6px">Sin ventas.</div>'}
+    </div>`).join('') : (j ? '<div class="card"><div class="vacio">Sin visitas a tiendas.</div></div>' : '');
+
+    const comidas = d.comidas.length ? `<div class="card det"><h3>🍽️ Comida</h3>${d.comidas.map(c =>
+      `<div class="nota">${esc(c.inicio)} – ${c.fin ? esc(c.fin) + ' · ' + c.minutos + ' min' : 'en curso'}</div>`).join('')}</div>` : '';
+
+    $('supDet').innerHTML = cab + fotos + visitas + comidas;
+    if (j) j.fotos.forEach(f => supFotoCargar(f.id));
+  }
+
+  async function supFotoCargar(id){
+    const ph = () => $('ph_' + id);
+    const poner = src => { const el = ph(); if (el) el.outerHTML = `<img src="${src}" alt="Foto" onclick="verFoto(this.src)">`; };
+    if (sup.fotos[id]){ poner(sup.fotos[id]); return; }
+    try{
+      const r = await conTiempo(srv('supFoto', implant, token(), id), 60000);
+      sup.fotos[id] = `data:${r.tipo};base64,${r.b64}`;
+      poner(sup.fotos[id]);
+    }catch(e){ const el = ph(); if (el) el.textContent = esErrorDeRed(e) ? 'Sin señal' : 'No se pudo cargar'; }
+  }
+  function verFoto(src){ $('visorImg').src = src; mostrar('visor', true); }
+
+  /* -------- Modo sin señal -------- */
+  function pintarModo(){
+    const on = modoSinSenal();
+    $('chkModo').checked = on;
+    $('cardModo').classList.toggle('on', on);
+    mostrar('indModo', on);
+    $('txtModo').textContent = on
+      ? 'Activado: todo se guarda en el celular. Desactívalo cuando tengas señal para enviar lo pendiente.'
+      : 'Actívalo en zonas sin cobertura: todo se guarda en el celular sin intentar enviar.';
+  }
+  async function cambiarModo(on){
+    guardarLocal('modo_sin_senal', on ? '1' : null);
+    pintarModo();
+    pintarPendientes();
+    if (on){ aviso('📴 Modo sin señal activado: tus registros se guardan en el celular', 'pendiente'); return; }
+    // Al apagarlo: se envía lo pendiente y se actualiza la pantalla con el servidor
+    if (leerCola().length) await enviarAhora();
+    else aviso('📶 Modo sin señal desactivado');
+    actualizarDatos();
+    if (implant && !leerCola().some(x => norm(x.payload.implant) === norm(implant))){
+      try{ hoy = await conTiempo(srv('getHoy', implant, token()), 15000); pintar(); }catch(e){}
+    }
+  }
+
   // Botón "Enviar ahora": muestra que está trabajando y cuántos se mandaron
   async function enviarAhora(){
     const btn = $('btnEnviarAhora');
     if (btn.disabled) return;
+    if (modoSinSenal()){
+      if (!(await preguntar('Estás en modo sin señal. ¿Lo desactivo y envío lo pendiente?', 'Sí, enviar', false, 'Seguir sin señal'))) return;
+      guardarLocal('modo_sin_senal', null); pintarModo();
+    }
     const antes = leerCola().length;
     btn.disabled = true;
     btn.textContent = '⏳ Enviando…';
@@ -1540,7 +1894,8 @@
       ? `⚠️ <b>No se pudo guardar:</b> ${esc(fallo.etiqueta || '')}${de(fallo)}<br>${esc(fallo.error)}` +
         (cola.length > 1 ? `<br><span class="nota">Hay ${cola.length - 1} más en el celular.</span>` : '')
       : `📶 <b>${cola.length} ${cola.length === 1 ? 'registro guardado' : 'registros guardados'} en el celular.</b><br>` +
-        `Se enviarán solos cuando vuelva la señal. No borres los datos de la app.`;
+        (modoSinSenal() ? 'Se enviarán cuando desactives el modo sin señal. No borres los datos de la app.'
+                        : 'Se enviarán solos cuando vuelva la señal. No borres los datos de la app.');
     if (!$('btnEnviarAhora').disabled) $('btnEnviarAhora').textContent = fallo ? 'Reintentar' : 'Enviar ahora';
     mostrar('btnDescartar', !!fallo);
   }
@@ -1580,7 +1935,7 @@
     const h = horaLocal();
     const abierto = abiertoEnLista();
     switch (accion){
-      case 'INICIO': hoy.iniciada = h; hoy.cedis = x.cedis; hoy.preventa = ''; hoy.cp = ''; hoy.coachJ = ''; hoy.coachJHora = ''; break;
+      case 'INICIO': hoy.iniciada = h; hoy.cedis = x.cedis; hoy.incid = x.incid || ''; hoy.preventa = ''; hoy.cp = ''; hoy.coachJ = ''; hoy.coachJHora = ''; break;
       case 'RUTA': hoy.preventa = x.ruta; hoy.cp = x.cp; break;
       case 'FIN': hoy.finalizada = h; break;
       case 'ENTRADA':
@@ -1703,6 +2058,7 @@
     mostrar('cardInstalar', false);
   }
 
+  pintarModo();
   iniciar();
 </script>
 </body>
