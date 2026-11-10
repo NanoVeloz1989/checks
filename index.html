@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 43 · va junto con Codigo.gs versión 43
+<!-- APP DE CHECKS · versión 45 · va junto con Codigo.gs versión 45
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -238,6 +238,12 @@
     <div style="margin:4px 0" id="txtVersiones"></div>
     Toca "Actualizar". Si sigue saliendo, cierra la app por completo (deslízala en apps recientes) y vuelve a abrirla con señal.
     <button class="btn" onclick="actualizarApp()">🔄 Actualizar</button>
+  </div>
+  <div class="card hidden" id="avisoServidor" style="background:#fee2e2;color:#991b1b">
+    <b>⚠️ Falta actualizar el servidor (Apps Script).</b>
+    <div style="margin:4px 0" id="txtServidor"></div>
+    Avisa a tu administrador: en Apps Script debe publicar "Nueva versión"
+    (Implementar → Gestionar implementaciones → Editar).
   </div>
 
   <!-- Llegó una versión nueva de la pantalla (app instalable) -->
@@ -562,16 +568,21 @@
       return;
     }
     cargando(true, 'Cargando…');
-    try{ datos = await srv('getDatos'); guardarCache(CACHE_DATOS, datos); }
+    try{ datos = await srv('getDatos'); datosFrescos = true; guardarCache(CACHE_DATOS, datos); }
     catch(e){ cargando(false); aviso(errMsg(e), 'error'); return; }
     cargando(false);
     arrancar();
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 44;
+  const VERSION_APP = 45;
+  let datosFrescos = false; // true cuando "datos" acaba de llegar del servidor (no de lo guardado)
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
+    // Pantalla más nueva que el servidor: falta publicar "Nueva versión" en Apps Script
+    const viejo = datosFrescos && Number(datos.version || 0) < VERSION_APP;
+    mostrar('avisoServidor', viejo);
+    if (viejo) $('txtServidor').textContent = `Esta pantalla: versión ${VERSION_APP} · Servidor: versión ${datos.version || 'anterior a 36'}`;
     $('txtVersiones').textContent = `Esta pantalla: versión ${VERSION_APP} · Servidor: versión ${datos.version || '?'}`;
     // Link viejo: invita a pasarse a la app instalable
     const nueva = EN_APPS_SCRIPT && datos.urlApp;
@@ -619,7 +630,7 @@
     try{ nuevos = await srv('getDatos'); }catch(e){ return; } // sin señal: se queda lo guardado
     const cambioImplants = JSON.stringify(nuevos.implants) !== JSON.stringify(datos.implants);
     const cambioCampos = JSON.stringify(nuevos.campos) !== JSON.stringify(datos.campos);
-    datos = nuevos;
+    datos = nuevos; datosFrescos = true;
     revisarVersion();
     if (implant) pintarCedis();
     guardarCache(CACHE_DATOS, nuevos);
@@ -1695,7 +1706,21 @@
     return enviando;
   }
 
+  // Tiendas y comida rechazadas por falta de ubicación (versiones anteriores): se mandan otra vez
+  // marcadas "sin GPS"; el servidor las guarda con latitud 0 y longitud 0.
+  function liberarSinGps(){
+    const c = leerCola(); let cambio = false;
+    c.forEach(x => {
+      if (x.error && x.fn === 'registrar' && /ubicaci/i.test(x.error) &&
+          ['ENTRADA', 'SALIDA', 'COMIDA_INI', 'COMIDA_FIN'].includes(x.payload.accion)){
+        delete x.error; x.payload.sinGps = true; cambio = true;
+      }
+    });
+    if (cambio) guardarCola(c);
+  }
+
   async function enviarFila(manual){
+    liberarSinGps();
     let resp = null, respDe = '', cerrarMiSesion = '';
     const detenidos = new Set(); // implants con un registro detenido: lo suyo espera, lo de otros sigue
     try{
@@ -1928,6 +1953,7 @@
   }
 
   function pintarPendientes(){
+    liberarSinGps();
     const cola = leerCola();
     mostrar('cardPendientes', cola.length > 0);
     if (!cola.length) return;

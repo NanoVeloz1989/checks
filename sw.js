@@ -1,8 +1,8 @@
 /* Guarda la pantalla en el celular para que la app abra sin señal.
    Al subir una versión nueva de index.html, sube también el número de CACHE. */
-const VERSION = 44;                 // igual que VERSION_APP de index.html
+const VERSION = 45;                 // igual que VERSION_APP de index.html
 const CACHE = 'checks-v' + VERSION;
-const ARCHIVOS = ['./', 'index.html', 'manifest.json', 'icono-192.png', 'icono-512.png', 'icono-180.png'];
+const ARCHIVOS = ['./', 'index.html', 'manifest.json', 'icono-192.png', 'icono-512.png', 'icono-180.png', 'icono-maskable-512.png'];
 
 // Al instalarse baja SIEMPRE la versión más nueva de GitHub (nunca una copia vieja del navegador)
 self.addEventListener('install', e => {
