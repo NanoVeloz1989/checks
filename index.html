@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 38 · va junto con Codigo.gs versión 38
+<!-- APP DE CHECKS · versión 41 · va junto con Codigo.gs versión 41
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -233,8 +233,16 @@
 
   <!-- Aviso: esta pantalla es más vieja que el servidor -->
   <div class="card hidden" id="avisoVersion" style="background:#fee2e2;color:#991b1b">
-    <b>⚠️ Hay una versión nueva de la app.</b><br>
-    Cierra la app por completo (deslízala en apps recientes) y vuelve a abrirla.
+    <b>⚠️ Hay una versión nueva de la app.</b>
+    <div style="margin:4px 0" id="txtVersiones"></div>
+    Toca "Actualizar". Si sigue saliendo, cierra la app por completo (deslízala en apps recientes) y vuelve a abrirla con señal.
+    <button class="btn" onclick="actualizarApp()">🔄 Actualizar</button>
+  </div>
+
+  <!-- Llegó una versión nueva de la pantalla (app instalable) -->
+  <div class="card hidden" id="avisoActualizar" style="background:#dbeafe;color:#1e3a8a">
+    <b>🔄 Hay una versión nueva de la app.</b>
+    <button class="btn" onclick="actualizarApp()">Actualizar</button>
   </div>
 
   <!-- Link viejo → app nueva -->
@@ -384,6 +392,7 @@
     <div id="supLista"></div>
     <div id="supDet" class="hidden"></div>
   </section>
+  <div class="nota" id="pieVersion" style="text-align:center;margin:18px 0 8px"></div>
 </main>
 <div id="visor" class="hidden" onclick="mostrar('visor', false)"><img id="visorImg" alt="Foto"></div>
 
@@ -459,6 +468,9 @@
 <div id="cargando"><div class="box"><div class="spin"></div><div id="msgCarga">Guardando…</div></div></div>
 <div id="toast"></div>
 
+<!-- App instalable: tu link /exec vive en config.js (se sube a GitHub UNA sola vez).
+     En Apps Script este archivo no existe y no hace falta. -->
+<script src="config.js"></script>
 <script>
   const NOMBRES = {
     ENTRADA: 'Entrada', SALIDA: 'Salida', COMIDA_INI: 'Salida a comer', COMIDA_FIN: 'Regreso de comida',
@@ -477,8 +489,17 @@
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   /* ======== CONEXIÓN CON EL SERVIDOR ========
-     App instalable: pega aquí el link /exec de tu implementación de Apps Script. */
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyIquLVqXCb56GF0IXXz758fPAHi_hn9db34u7VTDHB4JIXubu0jJZ5F5Hl_rNewF01Bg/exec';
+     App instalable: el link /exec se pone en config.js (no aquí), así cada versión nueva
+     de index.html se sube tal cual. */
+  // Respaldo: el último link bueno queda guardado en el celular
+  const API_URL = (() => {
+    let u = String(window.API_URL || '').trim();
+    try{
+      if (/^https:\/\/script\.google\.com\//.test(u)) localStorage.setItem('api_url', u);
+      else u = localStorage.getItem('api_url') || u;
+    }catch(e){}
+    return u;
+  })();
 
   const EN_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
   // Modo sin señal (lo prende el implant): no se intenta nada con el servidor, salvo entrar con usuario y PIN
@@ -490,7 +511,7 @@
         google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
     }
     if (!/^https:\/\/script\.google\.com\//.test(API_URL))
-      return Promise.reject(new Error('Falta configurar API_URL en index.html con el link /exec.'));
+      return Promise.reject(new Error('Falta tu link /exec en config.js (súbelo a GitHub con tu link).'));
     // text/plain evita la "pregunta previa" (CORS) que Apps Script no contesta
     return fetch(API_URL, {
       method: 'POST', redirect: 'follow',
@@ -547,9 +568,10 @@
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 38;
+  const VERSION_APP = 41;
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
+    $('txtVersiones').textContent = `Esta pantalla: versión ${VERSION_APP} · Servidor: versión ${datos.version || '?'}`;
     // Link viejo: invita a pasarse a la app instalable
     const nueva = EN_APPS_SCRIPT && datos.urlApp;
     if (nueva) $('lnkAppNueva').href = datos.urlApp;
@@ -695,23 +717,34 @@
     $('titulo').textContent = n;
     $('subtitulo').textContent = hoyTexto();
     pintarCamposExtra();
-    cargando(true, 'Cargando tus registros…');
     const local = leerHoyLocal(n);
-    if (leerCola().length && local){
-      // Hay registros sin enviar: se muestra lo del celular y se envían
-      hoy = local; pintar(); cargando(false);
-      procesarCola();
+    if (local){
+      // Se muestra de inmediato lo guardado en el celular (aunque la señal sea débil)…
+      hoy = local; pintar();
+      if (leerCola().length) procesarCola();          // hay registros sin enviar: se envían
+      else refrescarHoy(n);                            // …y se actualiza con el servidor en segundo plano
     } else {
+      cargando(true, 'Cargando tus registros…');
       try{ hoy = await conTiempo(srv('getHoy', n, token()), 15000); pintar(); }
       catch(e){
         if (esErrorSesion(e)){ cargando(false); pedirLogin(errMsg(e)); return; }
-        if (local && esErrorDeRed(e)){ hoy = local; pintar(); aviso('📶 Sin señal: se muestra lo guardado en el celular', 'pendiente'); }
-        else aviso(errMsg(e), 'error');
+        aviso(esErrorDeRed(e) ? '📶 Sin señal: intenta de nuevo cuando tengas señal' : errMsg(e), 'error');
       }
       cargando(false);
     }
     pintarPendientes();
     precargarSkus(); // deja el catálogo listo para cuando abran ventas
+  }
+
+  // Trae del servidor el estado del día sin bloquear la pantalla
+  async function refrescarHoy(n){
+    try{
+      const r = await conTiempo(srv('getHoy', n, token()), 20000);
+      // Solo si sigue siendo el mismo usuario y no registró nada mientras tanto
+      if (implant === n && !leerCola().some(x => norm(x.payload.implant) === norm(n))){ hoy = r; pintar(); }
+    }catch(e){
+      if (esErrorSesion(e) && implant === n) pedirLogin(errMsg(e));
+    }
   }
 
   /* -------- Listas extra (columnas B, C... de LISTAS) -------- */
@@ -2040,8 +2073,31 @@
 
   /* -------- App instalable --------
      El "service worker" guarda la pantalla en el celular para que abra sin señal. */
+  $('pieVersion').textContent = 'Checks · versión ' + VERSION_APP;
   if (!EN_APPS_SCRIPT && 'serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    const habiaVersion = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      // Busca versión nueva al abrir, al regresar a la app y cada 30 min
+      const revisar = () => { if (navigator.onLine && !modoSinSenal()) reg.update().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
+      setInterval(revisar, 30 * 60 * 1000);
+      revisar();
+    }).catch(() => {});
+    // Se ofrece recargar solo si la versión que quedó guardada es MÁS NUEVA que la que está abierta
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && Number(e.data.version) > VERSION_APP) mostrar('avisoActualizar', true);
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (habiaVersion && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
+    });
+  }
+  async function actualizarApp(){
+    if (leerCola().length) aviso('Tus registros pendientes se conservan', 'pendiente');
+    try{
+      const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+      if (reg) await conTiempo(reg.update(), 8000);
+    }catch(e){}
+    location.reload();
   }
   let promptInstalar = null;
   window.addEventListener('beforeinstallprompt', e => {
