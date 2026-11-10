@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- APP DE CHECKS · versión 41 · va junto con Codigo.gs versión 41
+<!-- APP DE CHECKS · versión 43 · va junto con Codigo.gs versión 43
      El MISMO archivo sirve en Apps Script (link /exec) y en GitHub Pages (app instalable).
      En GitHub Pages solo hay que poner el link /exec en API_URL (más abajo). -->
 <html lang="es">
@@ -178,6 +178,7 @@
   .foto{background:#f1f5f9;border-radius:12px;overflow:hidden;font-size:12px}
   .foto .ph{aspect-ratio:3/4;display:grid;place-items:center;color:var(--muted);background:#e2e8f0}
   .foto img{width:100%;display:block;cursor:zoom-in}
+  .foto .ph.vacia{background:#f8fafc;border:2px dashed #cbd5e1;font-size:13px;text-align:center;padding:8px}
   .foto .pie{padding:6px 8px}
   .vta{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
   .vta th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:4px 2px}
@@ -568,7 +569,7 @@
   }
 
   // Versión de esta pantalla (debe coincidir con VERSION_APP en Codigo.gs)
-  const VERSION_APP = 41;
+  const VERSION_APP = 44;
   function revisarVersion(){
     mostrar('avisoVersion', Number(datos.version || 0) > VERSION_APP);
     $('txtVersiones').textContent = `Esta pantalla: versión ${VERSION_APP} · Servidor: versión ${datos.version || '?'}`;
@@ -1559,9 +1560,14 @@
     const t0 = Date.now();
     cargando(true, 'Obteniendo ubicación…');
     try{
-      let pos;
+      // En tiendas y comida se registra aunque no haya GPS: queda marcado "SIN GPS".
+      // Inicio y fin de jornada sí exigen la ubicación.
+      const enTienda = ['ENTRADA', 'SALIDA', 'COMIDA_INI', 'COMIDA_FIN'].includes(check.accion);
+      let pos = null;
       try { pos = await ubicacionPendiente; }
-      catch(e){ pos = await pedirUbicacion(); } // segundo intento
+      catch(e){
+        if (!enTienda) pos = await pedirUbicacion(); // segundo intento
+      }
 
       let foto = null;
       if (archivo){
@@ -1572,13 +1578,15 @@
         const ahora = new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
         const marca = `${implant} · ${NOMBRES[check.accion]}${tienda ? ' · ' + tienda : ''}\n` +
                       (check.palabra ? `Palabra: ${check.palabra}\n` : '') +
-                      `${ahora} · ${pos.latitude.toFixed(5)}, ${pos.longitude.toFixed(5)}`;
+                      `${ahora} · ${pos ? pos.latitude.toFixed(5) + ', ' + pos.longitude.toFixed(5) : 'sin GPS'}`;
         foto = await procesarFoto(archivo, marca);
       }
 
       cargando(true, 'Guardando…');
       const seg = () => Math.round((Date.now() - t0) / 1000);
-      const base = { implant, lat: pos.latitude, lng: pos.longitude, acc: pos.accuracy, foto, palabra: check.palabra || '' };
+      const base = pos
+        ? { implant, lat: pos.latitude, lng: pos.longitude, acc: pos.accuracy, foto, palabra: check.palabra || '' }
+        : { implant, lat: null, lng: null, acc: null, sinGps: true, foto, palabra: check.palabra || '' };
 
       // Todo pasa por la fila de envíos: con señal se manda al instante; sin señal se guarda
       const sinSenal = '📶 Guardado en el celular; se enviará al volver la señal';
@@ -1610,7 +1618,8 @@
         if (check.accion === 'ENTRADA') limpiarFormulario();
         pintar();
         // Se muestra cuánto tardó, para detectar si algo va lento
-        aviso(r.enviado ? `✓ ${NOMBRES[check.accion]} registrada (${seg()} s)` : sinSenal, r.enviado ? '' : 'pendiente');
+        const nota = pos ? '' : ' · ⚠️ sin GPS';
+        aviso(r.enviado ? `✓ ${NOMBRES[check.accion]} registrada${nota} (${seg()} s)` : sinSenal + nota, r.enviado && pos ? '' : 'pendiente');
       }
       if (navigator.vibrate) navigator.vibrate(80);
     }catch(e){
@@ -1788,6 +1797,7 @@
           ${x.incidencia === 'Sí' ? '<span>⚠️ Incidencia o retardo</span>' : ''}
           <span>Coaching: ${x.coaching === 'Sí' ? (x.evidencia ? '✅ Sí' : '⚠️ Sí, sin evidencia') : x.coaching === 'No' ? 'No' : '—'}</span>
           <span>🏪 ${x.tiendas} ${x.tiendas === 1 ? 'tienda' : 'tiendas'}${x.enCurso ? ' (1 en curso)' : ''}</span>
+          ${x.sinGps ? `<span>📍 ${x.sinGps} sin GPS</span>` : ''}
           <span>🛒 ${x.ventas} ${x.ventas === 1 ? 'venta' : 'ventas'} · ${pesos(x.monto)}${x.cajas ? ' · ' + cajasTxt(x.cajas) : ''}</span>
         </div>` : ''}
       </div>`).join('');
@@ -1836,12 +1846,12 @@
     </div>`;
 
     const fotos = j && j.fotos.length ? `<div class="card det"><h3>📷 Fotos</h3><div class="fotos">${j.fotos.map(f =>
-      `<div class="foto"><div class="ph" id="ph_${esc(f.id)}">Cargando…</div>
+      `<div class="foto">${f.id ? `<div class="ph" id="ph_${esc(f.id)}">Cargando…</div>` : `<div class="ph vacia">${esc(f.vacio || 'Sin foto')}</div>`}
         <div class="pie"><b>${esc(f.titulo)}</b>${f.hora ? ' · ' + esc(f.hora) : ''}</div></div>`).join('')}</div></div>` : '';
 
     const visitas = d.visitas.length ? d.visitas.map(v => `<div class="card det">
       <h3>🏪 ${esc(v.tienda)}</h3>
-      <div class="nota">${esc(v.entrada)} – ${v.salida ? esc(v.salida) + ' · ' + v.minutos + ' min' : 'en curso'}${mapa(v.mapa, '📍 mapa')}</div>
+      <div class="nota">${esc(v.entrada)} – ${v.salida ? esc(v.salida) + ' · ' + v.minutos + ' min' : 'en curso'}${mapa(v.mapa, '📍 mapa')}${v.sinGps ? ` · <b>⚠️ Sin GPS (${esc(v.sinGps.toLowerCase())})</b>` : ''}</div>
       <div class="nota">${v.datos.map(x => esc(x.nombre) + ': ' + esc(x.valor)).concat(v.cp ? ['CP ' + esc(v.cp)] : [])
         .concat(v.grad1 ? ['3°–12° (RTD): ' + esc(v.grad1), '13°–45°: ' + esc(v.grad2)] : []).join(' · ')}</div>
       ${v.ventas.length ? `<table class="vta"><tr><th>Producto</th><th class="n">Pzs</th><th class="n">Cajas</th><th class="n">Monto</th></tr>
@@ -1852,10 +1862,10 @@
     </div>`).join('') : (j ? '<div class="card"><div class="vacio">Sin visitas a tiendas.</div></div>' : '');
 
     const comidas = d.comidas.length ? `<div class="card det"><h3>🍽️ Comida</h3>${d.comidas.map(c =>
-      `<div class="nota">${esc(c.inicio)} – ${c.fin ? esc(c.fin) + ' · ' + c.minutos + ' min' : 'en curso'}</div>`).join('')}</div>` : '';
+      `<div class="nota">${esc(c.inicio)} – ${c.fin ? esc(c.fin) + ' · ' + c.minutos + ' min' : 'en curso'}${c.sinGps ? ` · <b>⚠️ Sin GPS (${esc(c.sinGps === 'ENTRADA' ? 'salida a comer' : c.sinGps === 'SALIDA' ? 'regreso' : 'salida y regreso')})</b>` : ''}</div>`).join('')}</div>` : '';
 
     $('supDet').innerHTML = cab + fotos + visitas + comidas;
-    if (j) j.fotos.forEach(f => supFotoCargar(f.id));
+    if (j) j.fotos.filter(f => f.id).forEach(f => supFotoCargar(f.id));
   }
 
   async function supFotoCargar(id){
